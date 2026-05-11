@@ -50,6 +50,7 @@ declare -A MODULE_NAME=(
     [7]="Verificación final del sistema"
     [8]="ZSH + Powerlevel10k"
     [9]="KDE macOS Look + Idioma Español"
+    [10]="Git Setup (identidad + SSH + aliases)"
 )
 
 declare -A MODULE_FILE=(
@@ -63,6 +64,7 @@ declare -A MODULE_FILE=(
     [7]="${SCRIPT_DIR}/modules/07-verify.sh"
     [8]="${SCRIPT_DIR}/modules/08-zsh.sh"
     [9]="${SCRIPT_DIR}/modules/09-kde-macos.sh"
+    [10]="${SCRIPT_DIR}/modules/10-git.sh"
 )
 
 declare -A MODULE_FUNC=(
@@ -76,9 +78,10 @@ declare -A MODULE_FUNC=(
     [7]="run_module_verify"
     [8]="run_module_zsh"
     [9]="run_module_kde_macos"
+    [10]="run_module_git"
 )
 
-FULL_INSTALL_ORDER=(1 2 3 4 5 6 8 9 7)
+FULL_INSTALL_ORDER=(1 2 3 4 10 5 6 8 9 7)
 
 _module_status() {
     local real_home; real_home=$(eval echo "~${SUDO_USER:-$USER}")
@@ -93,6 +96,9 @@ _module_status() {
         7) echo "verificar" ;;
         8) [[ -d "${real_home}/.oh-my-zsh" ]] && echo "OK" || echo "pendiente" ;;
         9) [[ -f "${real_home}/.config/plasma-localerc" ]] && grep -q "es_ES" "${real_home}/.config/plasma-localerc" 2>/dev/null && echo "OK" || echo "pendiente" ;;
+        10) local ru="${SUDO_USER:-$USER}"
+            local gn; gn=$(sudo -u "$ru" git config --global user.name 2>/dev/null || echo "")
+            [[ -n "$gn" ]] && echo "OK" || echo "pendiente" ;;
     esac
 }
 
@@ -135,27 +141,30 @@ _tui_gum() {
     while true; do
         ui_banner
         local options=()
-        for i in 0 1 2 3 4 5 6 7 8; do
+        for i in 0 1 2 3 4 5 6 7 8 9 10; do
             local st; st=$(_module_status "$i")
+            local icon="○"
+            [[ "$st" == "OK" ]] && icon="${C_GREEN}✓${C_RESET}"
             options+=("[${i}] ${MODULE_NAME[$i]}  (${st})")
         done
-        options+=("────────────────────────────────────")
+        options+=("────────────────────────────────────────────────")
         options+=("[A] Instalación completa recomendada")
+        options+=("[M] Seleccionar módulos (multi-select)")
         options+=("[Q] Salir")
-        echo -e "${C_BOLD}  Navega con ↑↓ + ENTER:${C_RESET}"; echo ""
         local selected
-        selected=$(gum choose --cursor="  ▶ " --height=16 \
-            --header="  ANTIGRAVITY — Kubuntu 26.04 LTS" \
-            "${options[@]}" < /dev/tty 2>/dev/null) || true
+        selected=$(gum choose --cursor="  ▶ " --height=18 \
+            --header="  ANTIGRAVITY — Kubuntu 26.04 LTS  •  ↑↓ ENTER para seleccionar" \
+            "${options[@]}" < /dev/tty 2>/dev/tty) || true
         if [[ -z "$selected" ]]; then
             ui_warn "gum no responde — cambiando a modo numérico"
             _tui_numeric; return
         fi
-        local choice; choice=$(echo "$selected" | grep -oP '^\[(\w)\]' | tr -d '[]')
+        local choice; choice=$(echo "$selected" | grep -oP '^\[(\w+)\]' | tr -d '[]')
         case "${choice,,}" in
-            [0-8]) _execute_module_flow "$choice" ;;
-            a)     _execute_full_install ;;
-            q)     break ;;
+            [0-9]|10) _execute_module_flow "$choice" ;;
+            a)        _execute_full_install ;;
+            m)        _tui_multiselect ;;
+            q)        break ;;
         esac
     done
 }
@@ -164,17 +173,17 @@ _tui_multiselect() {
     ui_banner
     echo -e "${C_BOLD}  ESPACIO = marcar  •  ENTER = confirmar${C_RESET}"; echo ""
     local options=()
-    for i in 0 1 2 3 4 5 6 7 8; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
+    for i in 0 1 2 3 4 5 6 7 8 9 10; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
     local selected_raw
     selected_raw=$(gum choose --no-limit \
             --selected-prefix="  ● " --unselected-prefix="  ○ " \
-            --cursor="  ▶ " --height=12 \
-            --header="  Selecciona módulos" \
-            "${options[@]}" < /dev/tty 2>/dev/null)
+            --cursor="  ▶ " --height=14 \
+            --header="  Selecciona módulos (ESPACIO = marcar, ENTER = confirmar)" \
+            "${options[@]}" < /dev/tty 2>/dev/tty)
     [[ -z "$selected_raw" ]] && return
     local selected_indices=()
     while IFS= read -r line; do
-        local idx; idx=$(echo "$line" | grep -oP '^\[(\d)\]' | tr -d '[]')
+        local idx; idx=$(echo "$line" | grep -oP '^\[(\d+)\]' | tr -d '[]')
         [[ -n "$idx" ]] && selected_indices+=("$idx")
     done <<< "$selected_raw"
     [[ ${#selected_indices[@]} -eq 0 ]] && { ui_warn "Nada seleccionado"; return; }
@@ -193,21 +202,21 @@ _tui_numeric() {
     while true; do
         ui_banner
         echo -e "${C_BOLD}  MÓDULOS DISPONIBLES${C_RESET}"; echo ""
-        for i in 0 1 2 3 4 5 6 7 8 9; do
+        for i in 0 1 2 3 4 5 6 7 8 9 10; do
             local st; st=$(_module_status "$i")
             local sc="$C_GRAY" si=" "
             [[ "$st" == "OK" ]] && sc="$C_GREEN" && si="$ICON_OK"
-            printf "  ${C_CYAN}[%s]${C_RESET}  %-52s ${sc}%s (%s)${C_RESET}\n" \
+            printf "  ${C_CYAN}[%-2s]${C_RESET}  %-50s ${sc}%s (%s)${C_RESET}\n" \
                 "$i" "${MODULE_NAME[$i]}" "$si" "$st"
         done
-        echo ""; echo -e "  ${C_CYAN}[A]${C_RESET}  Instalación completa recomendada"
-        echo -e "  ${C_CYAN}[Q]${C_RESET}  Salir"; echo ""
+        echo ""; echo -e "  ${C_CYAN}[A] ${C_RESET}  Instalación completa recomendada"
+        echo -e "  ${C_CYAN}[Q] ${C_RESET}  Salir"; echo ""
         echo -ne "  ${C_BOLD}Selecciona opción: ${C_RESET}"; read -r choice
         case "${choice,,}" in
-            [0-9]) _execute_module_flow "$choice" ;;
-            a)     _execute_full_install ;;
-            q)     echo ""; ui_info "Saliendo..."; break ;;
-            *)     ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
+            [0-9]|10) _execute_module_flow "$choice" ;;
+            a)        _execute_full_install ;;
+            q)        echo ""; ui_info "Saliendo..."; break ;;
+            *)        ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
         esac
     done
 }

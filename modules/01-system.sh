@@ -22,8 +22,17 @@ APT::Get::AutomaticRemove "true";
 EOF'
     else ui_skip "apt.conf ya configurado"; fi
 
-    run_cmd 3 "apt update" apt update
-    run_cmd 3 "apt full-upgrade" apt full-upgrade -y \
+    # Deshabilitar PPAs rotos antes de actualizar (evita salida fatal por 404)
+    for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [[ -f "$f" ]] || continue
+        grep -q 'lutris' "$f" 2>/dev/null && {
+            ui_warn "PPA lutris sin soporte en $(lsb_release -cs 2>/dev/null) — deshabilitando: $f"
+            mv "$f" "${f}.disabled" 2>/dev/null || true
+        }
+    done
+
+    run_cmd 1 "apt update" apt update
+    run_cmd 2 "apt full-upgrade" apt full-upgrade -y \
         -o Dpkg::Options::="--force-confdef" \
         -o Dpkg::Options::="--force-confold"
 

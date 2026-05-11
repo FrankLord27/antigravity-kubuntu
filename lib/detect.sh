@@ -145,16 +145,19 @@ detect_harmony() {
 
 calculate_health_score() {
     local score=100 d=0
-    d=$(( ${#HARMONY_ISSUES[@]} * 15 + ${#HARMONY_WARNINGS[@]} * 5 ))
+    # Solo issues activos penalizan (warnings reducen menos)
+    d=$(( ${#HARMONY_ISSUES[@]} * 12 + ${#HARMONY_WARNINGS[@]} * 3 ))
+    # Crítico: driver NVIDIA no cargado
     [[ "$DETECT_NVIDIA_MODULE" == "missing" ]]  && d=$(( d + 20 ))
     [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]]  && d=$(( d + 10 ))
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]]      && d=$(( d + 5 ))
-    [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 8 ))
-    [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 5 ))
-    [[ "$DETECT_DOCKER_RUNNING" == "no" ]]      && d=$(( d + 5 ))
-    [[ "$DETECT_SECURE_BOOT" == "enabled" ]]    && d=$(( d + 10 ))
-    [[ "$DETECT_NTSYNC" == "missing" ]]         && d=$(( d + 3 ))
-    [[ "$DETECT_CUDA_VER" == "no instalado" ]]  && d=$(( d + 3 ))
+    # Importante: variante y suspensión
+    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]]      && d=$(( d + 4 ))
+    [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 6 ))
+    [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 3 ))
+    # Docker es importante pero no crítico
+    [[ "$DETECT_DOCKER_RUNNING" == "no" ]]      && d=$(( d + 3 ))
+    [[ "$DETECT_SECURE_BOOT" == "enabled" ]]    && d=$(( d + 8 ))
+    # NTSYNC y CUDA son opcionales — no penalizan
     score=$(( score - d ))
     [[ $score -lt 0 ]] && score=0; [[ $score -gt 100 ]] && score=100
     echo "$score"

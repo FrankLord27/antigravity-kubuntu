@@ -68,7 +68,9 @@ ui_progress() {
 }
 
 ui_panel_start() {
-    local title="${1:-Procesando...}" pad=$(( 54 - ${#title} ))
+    local title="${1:-Procesando...}"
+    local pad=$(( 55 - ${#title} ))
+    [[ $pad -lt 1 ]] && pad=1
     echo ""; printf "${C_BOLD}  ┌─ %s %s┐${C_RESET}\n" "$title" "$(printf '─%.0s' $(seq 1 $pad))"
 }
 

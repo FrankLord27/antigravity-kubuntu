@@ -82,13 +82,14 @@ _show_log_analysis() {
 
 _log_section() {
     local label="$1" data="$2"
-    local pad=$(( 46 - ${#label} ))
+    local pad=$(( 57 - ${#label} ))
+    [[ $pad -lt 1 ]] && pad=1
     echo -e "${C_BOLD}  ┌─ ${label} $(printf '─%.0s' $(seq 1 $pad))┐${C_RESET}"
     if [[ -z "$data" ]]; then
-        printf "  │  ${C_GREEN}${ICON_OK}  Sin errores detectados${C_RESET}%-36s│\n" ""
+        printf "  │  ${C_GREEN}%-58s${C_RESET}│\n" "${ICON_OK}  Sin errores detectados"
     else
         echo "$data" | head -5 | while IFS= read -r l; do
-            printf "  │  ${C_YELLOW}%-56s${C_RESET}│\n" "${l:0:56}"
+            printf "  │  %-58s│\n" "${l:0:58}"
         done
     fi
     echo -e "  └$(printf '─%.0s' {1..60})┘"; echo ""
@@ -97,10 +98,10 @@ _log_section() {
 _show_harmony_report() {
     echo -e "${C_BOLD}  ┌─ Armonía del Sistema ──────────────────────────────────────┐${C_RESET}"
     if [[ ${#HARMONY_ISSUES[@]} -eq 0 ]] && [[ ${#HARMONY_WARNINGS[@]} -eq 0 ]]; then
-        printf "  │  ${C_GREEN}${ICON_OK}  Todos los componentes están alineados${C_RESET}%-20s│\n" ""
+        printf "  │  ${C_GREEN}%-58s${C_RESET}│\n" "${ICON_OK}  Todos los componentes están alineados"
     else
-        for i in "${HARMONY_ISSUES[@]}";   do printf "  │  ${C_RED}${ICON_FAIL}  %-54s│\n" "${i:0:54}"; done
-        for w in "${HARMONY_WARNINGS[@]}"; do printf "  │  ${C_YELLOW}${ICON_WARN}  %-54s│\n" "${w:0:54}"; done
+        for i in "${HARMONY_ISSUES[@]}";   do printf "  │  ${C_RED}${ICON_FAIL}  %-55s${C_RESET}│\n" "${i:0:55}"; done
+        for w in "${HARMONY_WARNINGS[@]}"; do printf "  │  ${C_YELLOW}${ICON_WARN}  %-55s${C_RESET}│\n" "${w:0:55}"; done
     fi
     echo -e "  └$(printf '─%.0s' {1..60})┘"; echo ""
 }
@@ -109,16 +110,17 @@ _show_health_score() {
     local score; score=$(calculate_health_score)
     local color; color=$(score_color "$score")
     local label; label=$(score_label "$score")
-    local filled=$(( score * 40 / 100 )) empty=$(( 40 - score * 40 / 100 ))
-    local bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
+    local filled=$(( score * 40 / 100 ))
+    local empty=$(( 40 - score * 40 / 100 ))
+    local bar; bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
     echo ""
     echo -e "${C_BOLD}  ╔══════════════════════════════════════════════════════╗${C_RESET}"
     echo -e "${C_BOLD}  ║              HEALTH SCORE DEL SISTEMA               ║${C_RESET}"
     echo -e "${C_BOLD}  ╠══════════════════════════════════════════════════════╣${C_RESET}"
-    printf  "  ║   %b  %b%3d%%%b  —  %b%-12s%b              ║\n" \
-        "$bar" "$color$C_BOLD" "$score" "$C_RESET" "$color$C_BOLD" "$label" "$C_RESET"
-    [[ ${#HARMONY_ISSUES[@]} -gt 0 ]]   && printf "  ║   ${C_RED}${ICON_FAIL}  %d problema(s) crítico(s)${C_RESET}%-27s║\n" "${#HARMONY_ISSUES[@]}" ""
-    [[ ${#HARMONY_WARNINGS[@]} -gt 0 ]] && printf "  ║   ${C_YELLOW}${ICON_WARN}  %d advertencia(s)${C_RESET}%-35s║\n" "${#HARMONY_WARNINGS[@]}" ""
+    echo -e "  ║  ${bar}"
+    printf  "  ║  ${color}${C_BOLD}%-52s${C_RESET}║\n" "${score}%  —  ${label}"
+    printf  "  ║  ${C_DIM}Issues: %-4s  Warnings: %-4s${C_RESET}%-24s║\n" \
+        "${#HARMONY_ISSUES[@]}" "${#HARMONY_WARNINGS[@]}" ""
     echo -e "${C_BOLD}  ╚══════════════════════════════════════════════════════╝${C_RESET}"; echo ""
     _log "INFO" "Health Score: $score/100 — $label"
 }

@@ -69,21 +69,22 @@ _verify_nvidia() {
 
     { [[ -d /sys/module/ntsync ]] || lsmod 2>/dev/null | grep -q ntsync; } \
         && ui_ok "NTSYNC activo — gaming Proton optimizado" \
-        || ui_warn "NTSYNC no cargado"
+        || ui_info "NTSYNC no cargado — depende del kernel, no crítico"
 
     silent_cmd glxinfo && {
         local r; r=$(glxinfo 2>/dev/null | grep 'OpenGL renderer' | sed 's/.*: //')
-        echo "$r" | grep -qi nvidia && ui_ok "OpenGL NVIDIA: $r" || ui_warn "OpenGL NO usa NVIDIA: $r"
-    } || ui_warn "glxinfo no disponible — apt install mesa-utils"
+        echo "$r" | grep -qi nvidia && ui_ok "OpenGL NVIDIA: $r" || ui_warn "OpenGL renderer: $r"
+    } || ui_info "glxinfo no disponible (apt install mesa-utils) — no crítico en Wayland"
 
-    silent_cmd vulkaninfo --summary && ui_ok "Vulkan OK" || ui_warn "Vulkan no disponible"
+    silent_cmd vulkaninfo --summary && ui_ok "Vulkan OK" \
+        || ui_warn "vulkaninfo no disponible — apt install vulkan-tools"
 
     if is_cmd_available nvcc; then
         ui_ok "CUDA: $(nvcc --version 2>/dev/null | grep 'release' | awk '{print $6}' | tr -d ',')"
     elif [[ -d /usr/local/cuda ]] || is_deb_installed cuda-toolkit-12-8; then
-        ui_ok "CUDA toolkit instalado (nvcc en /usr/local/cuda/bin/)"
+        ui_ok "CUDA toolkit instalado"
     else
-        ui_warn "CUDA toolkit no instalado — ejecuta módulo 2 para instalar"
+        ui_info "CUDA toolkit no instalado — opcional, instala módulo 2 si usas GPU computing"
     fi
 }
 
@@ -123,12 +124,27 @@ _verify_dev() {
     [[ "$pnpm_ver" != "no" && -n "$pnpm_ver" ]] && ui_ok "pnpm: $pnpm_ver" \
         || ui_fail "pnpm no encontrado"
 
-    is_cmd_available code && ui_ok "VS Code: $(code --version 2>/dev/null | head -1)" || ui_warn "VS Code no en PATH"
-    is_cmd_available google-chrome-stable && ui_ok "Google Chrome instalado" || ui_warn "Chrome no encontrado"
-    is_cmd_available git && ui_ok "$(git --version 2>/dev/null)" || ui_fail "Git no encontrado"
-    is_cmd_available zsh && ui_ok "Zsh: $(zsh --version 2>/dev/null | head -1)" || ui_warn "Zsh no instalado"
-    [[ -d "${real_home}/.oh-my-zsh" ]] && ui_ok "Oh My Zsh instalado" || ui_warn "Oh My Zsh no encontrado"
-    [[ -f "${real_home}/.p10k.zsh" ]] && ui_ok "Powerlevel10k configurado (.p10k.zsh)" || ui_warn ".p10k.zsh no encontrado"
+    is_cmd_available code && ui_ok "VS Code: $(code --version 2>/dev/null | head -1)" \
+        || ui_warn "VS Code no en PATH — instala módulo 4"
+    { is_cmd_available google-chrome || is_cmd_available google-chrome-stable; } \
+        && ui_ok "Google Chrome instalado" || ui_warn "Chrome no encontrado — instala módulo 4"
+    is_cmd_available git && ui_ok "$(git --version 2>/dev/null)" \
+        || ui_fail "Git no encontrado — instala módulo 1"
+    is_cmd_available zsh && ui_ok "Zsh: $(zsh --version 2>/dev/null | head -1)" \
+        || ui_warn "Zsh no instalado — instala módulo 8"
+    [[ -d "${real_home}/.oh-my-zsh" ]] && ui_ok "Oh My Zsh instalado" \
+        || ui_warn "Oh My Zsh no encontrado — instala módulo 8"
+    [[ -f "${real_home}/.p10k.zsh" ]] && ui_ok "Powerlevel10k configurado" \
+        || ui_info ".p10k.zsh no encontrado — ejecuta 'p10k configure' en la terminal"
+
+    # Git identity
+    local gn; gn=$(sudo -u "$real_user" git config --global user.name  2>/dev/null || echo "")
+    local ge; ge=$(sudo -u "$real_user" git config --global user.email 2>/dev/null || echo "")
+    if [[ -n "$gn" ]] && [[ -n "$ge" ]]; then
+        ui_ok "Git identidad: $gn <$ge>"
+    else
+        ui_warn "Git identidad no configurada — ejecuta módulo 10"
+    fi
 }
 
 _verify_gaming() {
@@ -138,7 +154,8 @@ _verify_gaming() {
     is_deb_installed mangohud && ui_ok "MangoHud" || ui_warn "MangoHud no instalado"
     is_deb_installed gamemode && ui_ok "GameMode" || ui_warn "GameMode no instalado"
     is_deb_installed ffmpeg   && ui_ok "FFmpeg"   || ui_warn "FFmpeg no instalado"
-    flatpak list 2>/dev/null | grep -q 'pupgui2' && ui_ok "ProtonUp-Qt" || ui_warn "ProtonUp-Qt no instalado"
+    flatpak list 2>/dev/null | grep -q 'pupgui2' && ui_ok "ProtonUp-Qt (Flatpak)" \
+        || ui_info "ProtonUp-Qt no instalado — opcional, instala módulo 5"
 }
 
 _verify_system() {
@@ -183,16 +200,19 @@ _show_final_score() {
     local score; score=$(calculate_health_score)
     local color; color=$(score_color "$score")
     local label; label=$(score_label "$score")
-    local filled=$(( score * 40 / 100 )) empty=$(( 40 - score * 40 / 100 ))
-    local bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
+    local filled=$(( score * 40 / 100 ))
+    local empty=$(( 40 - score * 40 / 100 ))
+    local bar; bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
     echo ""
     echo -e "${C_BOLD}  ╔══════════════════════════════════════════════════════╗${C_RESET}"
     echo -e "${C_BOLD}  ║         HEALTH SCORE FINAL — ANTIGRAVITY            ║${C_RESET}"
     echo -e "${C_BOLD}  ╠══════════════════════════════════════════════════════╣${C_RESET}"
-    printf  "  ║   %b  %b%3d%%%b  —  %b%-10s%b                ║\n" \
-        "$bar" "$color$C_BOLD" "$score" "$C_RESET" "$color$C_BOLD" "$label" "$C_RESET"
-    printf  "  ║   Issues: %-4s  Warnings: %-4s                       ║\n" "${#HARMONY_ISSUES[@]}" "${#HARMONY_WARNINGS[@]}"
+    echo -e "  ║  ${bar}"
+    printf  "  ║  ${color}${C_BOLD}%-52s${C_RESET}║\n" "${score}%  —  ${label}"
+    printf  "  ║  ${C_DIM}Issues: %-4s  Warnings: %-4s${C_RESET}%-24s║\n" \
+        "${#HARMONY_ISSUES[@]}" "${#HARMONY_WARNINGS[@]}" ""
     echo -e "${C_BOLD}  ╚══════════════════════════════════════════════════════╝${C_RESET}"
+    echo ""
     _log "INFO" "Score final: $score/100 ($label)"
 }
 
@@ -200,9 +220,8 @@ _show_next_steps() {
     echo ""
     echo -e "${C_BOLD}  ┌─ PRÓXIMOS PASOS ──────────────────────────────────────┐${C_RESET}"
     echo -e "  │  ${C_WHITE}1.${C_RESET} Reinicia si instalaste NVIDIA: ${C_DIM}sudo reboot${C_RESET}        │"
-    echo -e "  │  ${C_WHITE}2.${C_RESET} Configura Git:                                    │"
-    echo -e "  │     ${C_DIM}git config --global user.name 'Frank Rodriguez'${C_RESET}    │"
-    echo -e "  │     ${C_DIM}git config --global user.email 'tu@email.com'${C_RESET}      │"
+    echo -e "  │  ${C_WHITE}2.${C_RESET} Configura Git (identidad + SSH):                  │"
+    echo -e "  │     ${C_DIM}Ejecuta módulo [10] desde el menú principal${C_RESET}        │"
     echo -e "  │  ${C_WHITE}3.${C_RESET} Verifica NVIDIA: ${C_DIM}nvidia-smi && dkms status${C_RESET}       │"
     echo -e "  │  ${C_WHITE}4.${C_RESET} Verifica GPU Docker:                              │"
     echo -e "  │     ${C_DIM}docker run --rm --gpus all ubuntu nvidia-smi${C_RESET}       │"
