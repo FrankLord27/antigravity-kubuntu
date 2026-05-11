@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dbus-send --print-reply --dest=org.kde.KWin /KWin org.freedesktop.DBus.Properties.Get string:\"org.kde.KWin\" string:\"currentDesktopName\")",
+      "Bash(fc-list)",
+      "Bash(bash -n modules/09-kde-macos.sh)",
+      "Bash(sudo bash *)",
+      "Bash(bash -n /home/frankf/Descargas/antigravity-kubuntu/modules/09-kde-macos.sh)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git config *)"
+    ]
+  }
+}
