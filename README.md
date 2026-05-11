@@ -1,18 +1,54 @@
-# ANTIGRAVITY BOOTSTRAP — Kubuntu Edition
+# ANTIGRAVITY Bootstrap — Kubuntu 26.04 LTS
 
-Sistema de post-instalación para **Kubuntu 26.04 LTS**.  
-**GTX 1660 SUPER · i5-10400F · Docker + IA · Gaming · Dev**
+Script de configuración automatizada para **Kubuntu 26.04 LTS** orientado a estaciones de trabajo con GPU NVIDIA, desarrollo de software, IA y gaming.
+
+```bash
+git clone git@github.com:FrankLord27/antigravity-kubuntu.git
+cd antigravity-kubuntu
+sudo bash antigravity.sh
+```
 
 ---
 
-## Inicio rápido
+## Requisitos
 
-```bash
-unzip antigravity-kubuntu.zip
-cd antigravity-kubuntu
-chmod +x antigravity.sh modules/*.sh
-sudo bash antigravity.sh
+| Componente | Mínimo |
+|---|---|
+| OS | Kubuntu / Ubuntu 26.04 LTS |
+| GPU | NVIDIA Turing o superior (GTX 1660+, RTX 20xx+) |
+| RAM | 8 GB |
+| Disco libre | 20 GB |
+| Internet | Requerido |
+
+> Probado en: **GTX 1660 SUPER · i5-10400F · 16 GB RAM · Kubuntu 26.04 LTS**
+
+---
+
+## Módulos
+
+| # | Módulo | Qué instala / configura |
+|---|---|---|
+| 0 | Diagnóstico del sistema | Hardware, drivers, logs de arranque, Health Score 0–100 |
+| 1 | Sistema base | `apt upgrade`, firmware, microcode Intel/AMD, sanitización de PPAs |
+| 2 | Driver NVIDIA | Driver 580-open (producción estable Turing), DKMS, Wayland |
+| 3 | Docker CE | Docker Engine oficial + NVIDIA Container Toolkit (GPU en contenedores) |
+| 4 | Stack de desarrollo | Node.js LTS (fnm), pnpm, VS Code, Google Chrome, Zsh |
+| 5 | Gaming | Steam, Lutris, Wine, Vulkan, MangoHud, GameMode, ProtonUp-Qt |
+| 6 | Optimización | ZRAM swap, TRIM SSD, PipeWire audio, Bluetooth, Timeshift backups |
+| 7 | Verificación final | Reporte completo del sistema, Health Score, próximos pasos |
+| 8 | ZSH + Powerlevel10k | Oh My Zsh, tema Powerlevel10k, plugins autosuggestions/syntax |
+| 9 | KDE macOS Look | Paneles, dock flotante, botones izquierda, modo oscuro GTK, español |
+| 10 | Git Setup | Identidad interactiva, aliases, clave SSH ed25519 para GitHub/GitLab |
+
+### Instalación completa recomendada
+
+La opción `[A]` ejecuta los módulos en este orden:
+
 ```
+1 → 2 → 3 → 4 → 10 → 5 → 6 → 8 → 9 → 7
+```
+
+Cada módulo detecta si ya está instalado y omite los pasos completados — es seguro volver a ejecutar cualquier módulo.
 
 ---
 
@@ -20,50 +56,30 @@ sudo bash antigravity.sh
 
 ```
 antigravity-kubuntu/
-├── antigravity.sh                  ← Entrada principal (TUI)
-├── modules/
-│   ├── 00-diagnostics.sh           ← Diagnóstico + Health Score 0-100
-│   ├── 01-system.sh                ← apt + firmware + microcode Intel
-│   ├── 02-nvidia.sh                ← Driver NVIDIA 580-open
-│   ├── 03-docker.sh                ← Docker CE + NVIDIA Container Toolkit
-│   ├── 04-dev.sh                   ← Node + pnpm + VS Code + Chrome + Zsh
-│   ├── 05-gaming.sh                ← Steam + Lutris + Vulkan + MangoHud
-│   ├── 06-system-optimize.sh       ← ZRAM + TRIM + PipeWire + Timeshift
-│   ├── 07-verify.sh                ← Verificación final + Health Score
-│   └── 08-zsh-kde.sh               ← ZSH + Powerlevel10k + KDE macOS look
+├── antigravity.sh          # Entrada principal, TUI numérico, orquestador
 ├── lib/
-│   ├── ui.sh                       ← TUI: colores, paneles, errores
-│   └── detect.sh                   ← Detección hardware + 20 reglas armonía
-├── configs/
-│   └── packages.conf               ← Versiones y paquetes editables
-└── README.md
+│   ├── ui.sh               # Colores, íconos, funciones de UI (ui_ok, ui_warn, run_cmd…)
+│   └── detect.sh           # Detección de hardware, driver y 20 reglas de armonía
+└── modules/
+    ├── 00-diagnostics.sh   # Diagnóstico completo + Health Score
+    ├── 01-system.sh        # Sistema base
+    ├── 02-nvidia.sh        # Driver NVIDIA 580-open
+    ├── 03-docker.sh        # Docker CE + NVIDIA Container Toolkit
+    ├── 04-dev.sh           # Stack desarrollo
+    ├── 05-gaming.sh        # Gaming
+    ├── 06-optimize.sh      # Optimización del sistema
+    ├── 07-verify.sh        # Verificación final
+    ├── 08-zsh.sh           # ZSH + Powerlevel10k
+    ├── 09-kde-macos.sh     # KDE tema macOS
+    └── 10-git.sh           # Git Setup completo
 ```
-
----
-
-## Módulos
-
-| # | Módulo | Qué hace |
-|---|--------|----------|
-| 0 | Diagnóstico | Health Score 0-100, logs arranque, 20 reglas de armonía |
-| 1 | Sistema base | apt optimizado, updates, firmware fwupd, microcode Intel |
-| 2 | NVIDIA | 580-open, Wayland, CUDA 12.8, suspensión, NTSYNC, sin X11 |
-| 3 | Docker | Docker CE oficial (no snap), NVIDIA Container Toolkit |
-| 4 | Dev stack | Node.js LTS (fnm), pnpm, VS Code, Chrome, Git, Zsh |
-| 5 | Gaming | Steam, Lutris, Wine, MangoHud, GameMode, ProtonUp-Qt |
-| 6 | Optimización | ZRAM, TRIM SSD, PipeWire, Bluetooth, Timeshift |
-| 7 | Verificación | Reporte completo, Health Score final, próximos pasos |
-| 8 | ZSH + KDE | Powerlevel10k, MesloLGS NF, KDE look macOS, español |
 
 ---
 
 ## Decisiones técnicas clave
 
 ### NVIDIA: 580-open (NO 595)
-Serie 595 tiene regresiones en Turing: parpadeos Wayland, cursor invisible Steam, pantalla negra suspensión.
-
-### CUDA: 12.8 (NO 13.x)
-Compatible con 580, estable para Ollama + Open WebUI + Docker GPU.
+La serie 595 tiene regresiones en Turing: parpadeos en Wayland, cursor invisible en Steam, pantalla negra al suspender.
 
 ### Wayland exclusivo
 Kubuntu 26.04 eliminó X11. El script no instala ni configura X11.
@@ -74,42 +90,19 @@ Kubuntu 26.04 eliminó X11. El script no instala ni configura X11.
 3. `NVreg_TemporaryFilePath=/var/tmp`
 
 ### NTSYNC
-Kernel 7.0 lo incluye nativamente. Mejora gaming con Proton.
+Kernel 7.0 lo incluye nativamente — mejora gaming con Proton sin configuración extra.
 
 ---
 
 ## Sistema de errores
 
-| Nivel | Tipo | Comportamiento |
-|-------|------|----------------|
-| 1 | WARNING | Registra y continúa |
-| 2 | ERROR | Salta el paso, continúa el módulo |
-| 3 | FATAL | Guarda log y aborta |
+| Nivel | Comportamiento |
+|---|---|
+| 1 — WARNING | Registra y continúa |
+| 2 — ERROR | Salta el paso, continúa el módulo |
+| 3 — FATAL | Guarda log y aborta |
 
-Log: `/var/log/antigravity/YYYY-MM-DD_HH-MM-SS.log`
-
----
-
-## Módulos independientes
-
-```bash
-sudo bash modules/00-diagnostics.sh   # diagnóstico
-sudo bash modules/02-nvidia.sh        # solo NVIDIA
-sudo bash modules/07-verify.sh        # solo verificación
-sudo bash modules/08-zsh-kde.sh       # solo ZSH + KDE
-```
-
----
-
-## Particiones recomendadas
-
-| Partición | Tamaño | Formato | Flag |
-|-----------|--------|---------|------|
-| /boot/efi | 1 GB | FAT32 | arranque |
-| /boot | 2 GB | EXT4 | — |
-| / | 80 GB | EXT4 | raíz |
-| swap | 16 GB | swap | intercambio |
-| /home | ~144 GB | EXT4 | — |
+Log de cada ejecución: `/var/log/antigravity/YYYY-MM-DD_HH-MM-SS.log`
 
 ---
 
@@ -118,12 +111,11 @@ sudo bash modules/08-zsh-kde.sh       # solo ZSH + KDE
 ```bash
 sudo bash NVIDIA-Linux-x86_64-*.run   # rompe apt y DKMS
 sudo ubuntu-drivers autoinstall        # puede instalar 595 en Turing
-sudo snap install docker               # GPU no disponible, conflicto con CE
+sudo snap install docker               # GPU no disponible en snap
 ```
 
 ---
 
 ## Autor
 
-Frank Felix Rodríguez — antigravity  
-Kubuntu 26.04 LTS · GTX 1660 SUPER · i5-10400F
+Frank Felix — Kubuntu 26.04 LTS · GTX 1660 SUPER · i5-10400F
