@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY — modules/08-zsh-kde.sh [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP — modules/08-zsh-kde.sh [Kubuntu 26.04 LTS]
 #  ZSH + Oh My Zsh + Powerlevel10k + MesloLGS NF
 #  + KDE Plasma 6 look macOS (nativo — sin software de terceros)
 #
@@ -44,7 +44,7 @@ run_module_zsh() {
 # ─── FASE 1: BACKUP ──────────────────────────────────────────────────────────
 _backup_config() {
     local home="$1"
-    local bdir="${home}/.antigravity-backup-$(date '+%Y%m%d_%H%M%S')"
+    local bdir="${home}/.kubuntu-auto-setup-backup-$(date '+%Y%m%d_%H%M%S')"
     ui_info "Creando backup de configuración existente..."
     mkdir -p "$bdir"
     local backed=false
@@ -129,7 +129,7 @@ _write_zshrc() {
     ui_info "Escribiendo .zshrc completo..."
     sudo -u "$real_user" tee "${home}/.zshrc" > /dev/null << ZSHRC
 # ============================================================
-#  .zshrc — ANTIGRAVITY [Kubuntu 26.04 LTS]
+#  .zshrc — KUBUNTU AUTO SETUP [Kubuntu 26.04 LTS]
 #  Frank Felix Rodríguez — $(date '+%Y-%m-%d')
 # ============================================================
 
@@ -195,9 +195,9 @@ alias sysinfo='inxi -Fxz'
 alias temp='sensors 2>/dev/null | grep -E "temp|Core|fan"'
 alias gpu='nvidia-smi --query-gpu=name,driver_version,temperature.gpu,utilization.gpu --format=csv,noheader'
 
-# Antigravity
-alias ag-diag='sudo bash \$HOME/antigravity-kubuntu/modules/00-diagnostics.sh'
-alias ag-verify='sudo bash \$HOME/antigravity-kubuntu/modules/07-verify.sh'
+# Kubuntu Auto Setup
+alias ag-diag='sudo bash \$HOME/kubuntu-auto-setup/modules/00-diagnostics.sh'
+alias ag-verify='sudo bash \$HOME/kubuntu-auto-setup/modules/07-verify.sh'
 
 # Autocompletado
 autoload -Uz compinit && compinit
@@ -220,7 +220,7 @@ ZSHRC
 _write_p10k_config() {
     local home="$1" real_user="$2"
     sudo -u "$real_user" tee "${home}/.p10k.zsh" > /dev/null << 'P10K'
-# Powerlevel10k config — ANTIGRAVITY
+# Powerlevel10k config — KUBUNTU AUTO SETUP
 'builtin' 'local' '-a' 'p10k_config_opts'
 [[ ! -o 'aliases'         ]] || p10k_config_opts+=('aliases')
 [[ ! -o 'sh_glob'         ]] || p10k_config_opts+=('sh_glob')
@@ -275,8 +275,8 @@ _configure_konsole() {
     local real_user="$1" home="$2"
     local kdir="${home}/.local/share/konsole"
     sudo -u "$real_user" mkdir -p "$kdir"
-    local pf="${kdir}/Antigravity.profile"
-    [[ -f "$pf" ]] && ui_skip "Perfil Konsole Antigravity ya existe" || {
+    local pf="${kdir}/Kubuntu Auto Setup.profile"
+    [[ -f "$pf" ]] && ui_skip "Perfil Konsole Kubuntu Auto Setup ya existe" || {
         sudo -u "$real_user" tee "$pf" > /dev/null << 'PROFILE'
 [Appearance]
 ColorScheme=Breeze
@@ -284,7 +284,7 @@ Font=MesloLGS NF,13,-1,5,50,0,0,0,0,0
 
 [General]
 Command=/usr/bin/zsh
-Name=Antigravity
+Name=Kubuntu Auto Setup
 Parent=FALLBACK/
 TerminalColumns=120
 TerminalRows=30
@@ -293,18 +293,18 @@ TerminalRows=30
 HistorySize=10000
 ScrollBarPosition=2
 PROFILE
-        ui_ok "Perfil Konsole 'Antigravity' creado con MesloLGS NF"
+        ui_ok "Perfil Konsole 'Kubuntu Auto Setup' creado con MesloLGS NF"
     }
 
     local konsolerc="${home}/.config/konsolerc"
-    if grep -q 'Antigravity' "$konsolerc" 2>/dev/null; then
-        ui_skip "Perfil Antigravity ya predeterminado"
+    if grep -q 'Kubuntu Auto Setup' "$konsolerc" 2>/dev/null; then
+        ui_skip "Perfil Kubuntu Auto Setup ya predeterminado"
     else
         sudo -u "$real_user" bash -c \
             "grep -q 'DefaultProfile' '$konsolerc' 2>/dev/null && \
-            sed -i 's/DefaultProfile=.*/DefaultProfile=Antigravity.profile/' '$konsolerc' || \
-            { mkdir -p '${home}/.config'; printf '[Desktop Entry]\nDefaultProfile=Antigravity.profile\n' >> '$konsolerc'; }"
-        ui_ok "Perfil Antigravity establecido como predeterminado"
+            sed -i 's/DefaultProfile=.*/DefaultProfile=Kubuntu Auto Setup.profile/' '$konsolerc' || \
+            { mkdir -p '${home}/.config'; printf '[Desktop Entry]\nDefaultProfile=Kubuntu Auto Setup.profile\n' >> '$konsolerc'; }"
+        ui_ok "Perfil Kubuntu Auto Setup establecido como predeterminado"
     fi
 }
 
@@ -323,7 +323,7 @@ _show_post_instructions() {
     echo -e "  │  ${C_WHITE}3.${C_RESET} Para reconfigurar tema ZSH: ${C_DIM}p10k configure${C_RESET}          │"
     echo -e "  │                                                            │"
     echo -e "  │                                                            │"
-    printf  "  │  ${C_WHITE}Backup:${C_RESET} ${C_DIM}~/.antigravity-backup-*${C_RESET}%-26s│\n" ""
+    printf  "  │  ${C_WHITE}Backup:${C_RESET} ${C_DIM}~/.kubuntu-auto-setup-backup-*${C_RESET}%-26s│\n" ""
     echo -e "  └────────────────────────────────────────────────────────────┘"
     echo ""
 }

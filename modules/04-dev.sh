@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/04-dev.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/04-dev.sh [Kubuntu 26.04 LTS]
 # Stack de desarrollo: Node.js LTS (fnm) + pnpm + VS Code + Chrome + Git + Zsh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

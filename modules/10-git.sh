@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/10-git.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/10-git.sh [Kubuntu 26.04 LTS]
 # Git completo: identidad interactiva, aliases, SSH key, configuración global
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

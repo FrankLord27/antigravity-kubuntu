@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/03-docker.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/03-docker.sh [Kubuntu 26.04 LTS]
 # Docker CE oficial (NO snap, NO apt Ubuntu) + NVIDIA Container Toolkit
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

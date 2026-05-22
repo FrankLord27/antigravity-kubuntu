@@ -1,11 +1,11 @@
-# ANTIGRAVITY Bootstrap — Kubuntu 26.04 LTS
+# KUBUNTU AUTO SETUP Bootstrap — Kubuntu 26.04 LTS
 
 Script de configuración automatizada para **Kubuntu 26.04 LTS** orientado a estaciones de trabajo con GPU NVIDIA, desarrollo de software, IA y gaming.
 
 ```bash
-git clone git@github.com:FrankLord27/antigravity-kubuntu.git
-cd antigravity-kubuntu
-sudo bash antigravity.sh
+git clone git@github.com:FrankLord27/kubuntu-auto-setup.git
+cd kubuntu-auto-setup
+sudo bash kubuntu-auto-setup.sh
 ```
 
 ---
@@ -55,8 +55,8 @@ Cada módulo detecta si ya está instalado y omite los pasos completados — es 
 ## Estructura
 
 ```
-antigravity-kubuntu/
-├── antigravity.sh          # Entrada principal, TUI numérico, orquestador
+kubuntu-auto-setup/
+├── kubuntu-auto-setup.sh          # Entrada principal, TUI numérico, orquestador
 ├── lib/
 │   ├── ui.sh               # Colores, íconos, funciones de UI (ui_ok, ui_warn, run_cmd…)
 │   └── detect.sh           # Detección de hardware, driver y 20 reglas de armonía
@@ -102,7 +102,7 @@ Kernel 7.0 lo incluye nativamente — mejora gaming con Proton sin configuració
 | 2 — ERROR | Salta el paso, continúa el módulo |
 | 3 — FATAL | Guarda log y aborta |
 
-Log de cada ejecución: `/var/log/antigravity/YYYY-MM-DD_HH-MM-SS.log`
+Log de cada ejecución: `/var/log/kubuntu-auto-setup/YYYY-MM-DD_HH-MM-SS.log`
 
 ---
 
