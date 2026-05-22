@@ -124,9 +124,58 @@ _setup_ssh_key() {
     ui_ok "SSH key lista: $ssh_key"
 }
 
+_setup_github_cli_and_signing() {
+    local real_user="$1"
+    local real_home; real_home=$(eval echo "~$real_user")
+    local ssh_key="${real_home}/.ssh/id_ed25519"
+    local ssh_pub="${ssh_key}.pub"
+    local git_email; git_email=$(sudo -u "$real_user" git config --global user.email 2>/dev/null || echo "")
+
+    ui_info "Instalando GitHub CLI (gh)..."
+    if is_deb_installed gh; then
+        ui_skip "gh ya instalado"
+    else
+        run_cmd 2 "GPG key GitHub CLI" bash -c \
+            'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null \
+            && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg'
+        run_cmd 2 "Repo GitHub CLI" bash -c \
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+            https://cli.github.com/packages stable main" \
+            > /etc/apt/sources.list.d/github-cli.list'
+        run_cmd 2 "apt update post-gh" apt update
+        run_cmd 2 "Instalar gh" apt install -y gh
+    fi
+
+    if [[ -f "$ssh_pub" ]]; then
+        ui_info "Configurando firma SSH en Git..."
+        run_cmd 1 "git format ssh"        sudo -u "$real_user" git config --global gpg.format ssh
+        run_cmd 1 "git signingkey"        sudo -u "$real_user" git config --global user.signingkey "$ssh_pub"
+        run_cmd 1 "git commit sign"       sudo -u "$real_user" git config --global commit.gpgsign true
+        run_cmd 1 "git tag sign"          sudo -u "$real_user" git config --global tag.gpgsign true
+
+        # Allowed signers
+        run_cmd 1 "Crear allowed_signers" sudo -u "$real_user" bash -c "mkdir -p ~/.config/git && echo '$git_email $(cat $ssh_pub)' > ~/.config/git/allowed_signers"
+        run_cmd 1 "Config allowed_signers" sudo -u "$real_user" git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers
+        ui_ok "Git configurado para firmar con $ssh_pub"
+
+        ui_info "Configurando Signing Key en GitHub..."
+        if sudo -u "$real_user" gh auth status &>/dev/null; then
+            run_cmd 1 "Subir Signing Key a GitHub" sudo -u "$real_user" gh ssh-key add "$ssh_pub" --type signing --title "Signing key Kubuntu" || {
+                ui_warn "Puede que necesites permisos adicionales. Ejecuta:"
+                ui_warn "  gh auth refresh -h github.com -s admin:ssh_signing_key"
+            }
+        else
+            ui_warn "No estás logueado en gh. Para subir la llave automáticamente usa:"
+            ui_warn "  gh auth login"
+            ui_warn "  gh ssh-key add $ssh_pub --type signing --title \"Signing key Kubuntu\""
+        fi
+    fi
+}
+
 run_module_git() {
     ui_step "MÓDULO 10 — GIT SETUP"
-    ui_panel_start "Identidad + Aliases + SSH key"
+    ui_panel_start "Identidad + Aliases + SSH key + Firma GitHub"
     local real_user="${SUDO_USER:-$USER}"
 
     is_deb_installed git && ui_skip "git (ya instalado)" \
@@ -135,6 +184,7 @@ run_module_git() {
     _ask_git_identity    "$real_user"
     _configure_git_settings "$real_user"
     _setup_ssh_key       "$real_user"
+    _setup_github_cli_and_signing "$real_user"
 
     ui_panel_end; ui_ok "Módulo 10 completado"
 

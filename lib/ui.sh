@@ -39,9 +39,15 @@ ui_run()  { echo -e "${C_MAGENTA}${C_BOLD}  ${ICON_RUN}  ${C_RESET}${C_DIM}$*${C
 ui_skip() { echo -e "${C_GRAY}  ${ICON_SKIP}  $* ${C_DIM}(ya instalado — omitido)${C_RESET}"; _log "SKIP" "$*"; (( AG_SKIP_COUNT++ )) || true; }
 
 ui_step() {
-    local line; line=$(printf '─%.0s' {1..56})
+    local text="$*"
+    # Truncate text if it's too long to fit in the box
+    if [ ${#text} -gt 54 ]; then
+        text="${text:0:51}..."
+    fi
+    local line; line=$(printf '─%.0s' {1..58})
     echo ""; echo -e "${C_BLUE}${C_BOLD}  ┌${line}┐${C_RESET}"
-    printf "${C_BLUE}${C_BOLD}  │  %-54s│${C_RESET}\n" "$*"
+    printf "${C_BLUE}${C_BOLD}  │  %-56s│${C_RESET}
+" "$text"
     echo -e "${C_BLUE}${C_BOLD}  └${line}┘${C_RESET}"; echo ""
     _log "STEP" "$*"
 }
@@ -50,9 +56,9 @@ ui_banner() {
     clear; echo ""
     echo -e "${C_CYAN}${C_BOLD}"
     echo "   ╔══════════════════════════════════════════════════════════╗"
-    echo "   ║        A N T I G R A V I T Y   B O O T S T R A P       ║"
-    echo "   ║                  [ Kubuntu Edition ]                    ║"
-    echo "   ║   Kubuntu 26.04 LTS  •  GTX 1660 SUPER  •  i5-10400F  ║"
+    echo "   ║      K U B U N T U   A U T O   S E T U P   T O O L       ║"
+    echo "   ║                  [ Kubuntu Edition ]                     ║"
+    echo "   ║   Kubuntu 26.04 LTS  •  GTX 1660 SUPER  •  i5-10400F     ║"
     echo "   ╚══════════════════════════════════════════════════════════╝"
     echo -e "${C_RESET}"
     echo -e "${C_GRAY}   $(date '+%A %d %b %Y')  •  $(date '+%H:%M')  •  Kernel: $(uname -r)${C_RESET}"; echo ""
@@ -69,9 +75,13 @@ ui_progress() {
 
 ui_panel_start() {
     local title="${1:-Procesando...}"
+    if [ ${#title} -gt 53 ]; then
+        title="${title:0:50}..."
+    fi
     local pad=$(( 55 - ${#title} ))
     [[ $pad -lt 1 ]] && pad=1
-    echo ""; printf "${C_BOLD}  ┌─ %s %s┐${C_RESET}\n" "$title" "$(printf '─%.0s' $(seq 1 $pad))"
+    echo ""; printf "${C_BOLD}  ┌─ %s %s┐${C_RESET}
+" "$title" "$(printf '─%.0s' $(seq 1 $pad))"
 }
 
 ui_panel_end() { echo -e "  └$(printf '─%.0s' {1..58})┘"; echo ""; }
@@ -106,15 +116,25 @@ ui_confirm() {
 ui_pause() { echo -e "\n  ${C_DIM}Presiona ENTER para continuar...${C_RESET}"; read -r; }
 
 ui_summary() {
-    local line; line=$(printf '═%.0s' {1..56})
+    local line; line=$(printf '═%.0s' {1..58})
     echo ""; echo -e "${C_BOLD}  ╔${line}╗${C_RESET}"
-    printf "${C_BOLD}  ║${C_RESET}  %-54s${C_BOLD}║${C_RESET}\n" "RESUMEN DE LA SESIÓN"
+    printf "${C_BOLD}  ║${C_RESET}  %-56s${C_BOLD}║${C_RESET}
+" "RESUMEN DE LA SESIÓN"
     echo -e "${C_BOLD}  ╠${line}╣${C_RESET}"
-    printf "  ║  ${C_GREEN}${ICON_OK}  OK        : %-4s${C_RESET}%-34s${C_BOLD}║${C_RESET}\n" "$AG_OK_COUNT" ""
-    printf "  ║  ${C_YELLOW}${ICON_WARN}  Warnings  : %-4s${C_RESET}%-34s${C_BOLD}║${C_RESET}\n" "$AG_WARN_COUNT" ""
-    printf "  ║  ${C_GRAY}${ICON_SKIP}  Omitidos  : %-4s${C_RESET}%-34s${C_BOLD}║${C_RESET}\n" "$AG_SKIP_COUNT" ""
-    printf "  ║  ${C_RED}${ICON_FAIL}  Errores   : %-4s${C_RESET}%-34s${C_BOLD}║${C_RESET}\n" "$AG_ERROR_COUNT" ""
+    printf "  ║  ${C_GREEN}${ICON_OK}  OK        : %-4s${C_RESET}%-36s${C_BOLD}║${C_RESET}
+" "$AG_OK_COUNT" ""
+    printf "  ║  ${C_YELLOW}${ICON_WARN}  Warnings  : %-4s${C_RESET}%-36s${C_BOLD}║${C_RESET}
+" "$AG_WARN_COUNT" ""
+    printf "  ║  ${C_GRAY}${ICON_SKIP}  Omitidos  : %-4s${C_RESET}%-36s${C_BOLD}║${C_RESET}
+" "$AG_SKIP_COUNT" ""
+    printf "  ║  ${C_RED}${ICON_FAIL}  Errores   : %-4s${C_RESET}%-36s${C_BOLD}║${C_RESET}
+" "$AG_ERROR_COUNT" ""
     echo -e "${C_BOLD}  ╠${line}╣${C_RESET}"
-    printf "  ║  Log: %-50s║\n" "${AG_LOG_FILE}"
+    local log_text="Log: ${AG_LOG_FILE}"
+    if [ ${#log_text} -gt 56 ]; then
+        log_text="${log_text:0:53}..."
+    fi
+    printf "  ║  %-56s║
+" "$log_text"
     echo -e "${C_BOLD}  ╚${line}╝${C_RESET}"; echo ""
 }
