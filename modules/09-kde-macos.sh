@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/09-kde-macos.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/09-kde-macos.sh [Kubuntu 26.04 LTS]
 # KDE Plasma 6: macOS Look (Paneles, KWin) e Idioma Español
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,8 +18,8 @@ _configure_kde_macos() {
     # Configuración de Paneles vía DBus (Top Menu + Bottom Dock)
     # Usa archivos temporales para evitar el problema de variables locales no exportadas
     # bajo sudo y el infierno de quoting en dbus-send con scripts multilínea.
-    local tmp_js; tmp_js=$(mktemp /tmp/antigravity-kde.XXXXXX.js)
-    local wrapper; wrapper=$(mktemp /tmp/antigravity-kde.XXXXXX.sh)
+    local tmp_js; tmp_js=$(mktemp /tmp/kubuntu-auto-setup-kde.XXXXXX.js)
+    local wrapper; wrapper=$(mktemp /tmp/kubuntu-auto-setup-kde.XXXXXX.sh)
 
     cat > "$tmp_js" << 'JS_EOF'
 // Detectar pantalla primaria (la que está en la coordenada 0,0)

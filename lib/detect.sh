@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY — lib/detect.sh  [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP — lib/detect.sh  [Kubuntu 26.04 LTS]
 #  Detección hardware + estado sistema + 20 reglas de armonía
 #  Driver recomendado: 580-open | CUDA: 12.8 | Wayland exclusivo
 # =============================================================================

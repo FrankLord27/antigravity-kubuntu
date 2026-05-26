@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/01-system.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/01-system.sh [Kubuntu 26.04 LTS]
 # Sistema base: apt optimizado, updates, firmware, microcode Intel i5-10400F
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,8 +12,8 @@ run_module_system() {
     export DEBIAN_FRONTEND=noninteractive
 
     ui_info "Configurando apt para máxima velocidad..."
-    if [[ ! -f /etc/apt/apt.conf.d/99-antigravity ]]; then
-        run_cmd 1 "Configurar apt.conf" bash -c 'cat > /etc/apt/apt.conf.d/99-antigravity << EOF
+    if [[ ! -f /etc/apt/apt.conf.d/99-kubuntu-auto-setup ]]; then
+        run_cmd 1 "Configurar apt.conf" bash -c 'cat > /etc/apt/apt.conf.d/99-kubuntu-auto-setup << EOF
 Acquire::http::Pipeline-Depth "10";
 Acquire::https::Pipeline-Depth "10";
 Acquire::ForceIPv4 "true";

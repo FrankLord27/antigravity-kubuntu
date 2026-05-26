@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY BOOTSTRAP — Entrada Principal [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP BOOTSTRAP — Entrada Principal [Kubuntu 26.04 LTS]
 #  GTX 1660 SUPER • i5-10400F • Docker + IA • Gaming • Dev
-#  Uso: sudo bash antigravity.sh
+#  Uso: sudo bash kubuntu-auto-setup.sh
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +13,7 @@ export GUM_AVAILABLE=true
 export DEBIAN_FRONTEND=noninteractive
 
 _preflight() {
-    [[ $EUID -ne 0 ]] && { echo ""; echo "  ERROR: sudo bash antigravity.sh"; echo ""; exit 1; }
+    [[ $EUID -ne 0 ]] && { echo ""; echo "  ERROR: sudo bash kubuntu-auto-setup.sh"; echo ""; exit 1; }
     ping -c 1 -W 3 8.8.8.8 &>/dev/null || { echo ""; echo "  ERROR: Sin internet."; echo ""; exit 1; }
     source /etc/os-release 2>/dev/null
     [[ "$ID" != "ubuntu" ]] && [[ "$ID_LIKE" != *"ubuntu"* ]] && {
@@ -92,7 +92,7 @@ _module_status() {
         3) is_service_active docker && echo "OK" || echo "pendiente" ;;
         4) [[ -d "${real_home}/.local/share/fnm" ]] && echo "OK" || echo "pendiente" ;;
         5) { is_deb_installed steam-installer || is_deb_installed steam; } && echo "OK" || echo "pendiente" ;;
-        6) [[ -f /etc/sysctl.d/99-antigravity.conf ]] && echo "OK" || echo "pendiente" ;;
+        6) [[ -f /etc/sysctl.d/99-kubuntu-auto-setup.conf ]] && echo "OK" || echo "pendiente" ;;
         7) echo "verificar" ;;
         8) [[ -d "${real_home}/.oh-my-zsh" ]] && echo "OK" || echo "pendiente" ;;
         9) [[ -f "${real_home}/.config/plasma-localerc" ]] && grep -q "es_ES" "${real_home}/.config/plasma-localerc" 2>/dev/null && echo "OK" || echo "pendiente" ;;
@@ -153,7 +153,7 @@ _tui_gum() {
         options+=("[Q] Salir")
         local selected
         selected=$(gum choose --cursor="  ▶ " --height=18 \
-            --header="  ANTIGRAVITY — Kubuntu 26.04 LTS  •  ↑↓ ENTER para seleccionar" \
+            --header="  KUBUNTU AUTO SETUP — Kubuntu 26.04 LTS  •  ↑↓ ENTER para seleccionar" \
             "${options[@]}" < /dev/tty 2>/dev/tty) || true
         if [[ -z "$selected" ]]; then
             ui_warn "gum no responde — cambiando a modo numérico"
@@ -236,7 +236,7 @@ main() {
 
     _tui_numeric
 
-    echo ""; ui_ok "Antigravity Bootstrap finalizado."
+    echo ""; ui_ok "Kubuntu Auto Setup Bootstrap finalizado."
     echo -e "  ${C_DIM}Log: ${AG_LOG_FILE}${C_RESET}"; echo ""
 }
 
