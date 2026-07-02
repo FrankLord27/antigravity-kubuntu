@@ -97,9 +97,19 @@ de usuario (MesloLGS NF) y perfil de Konsole.
 
 ## Decisiones técnicas clave
 
-### NVIDIA: 580-open (NO 595)
+### NVIDIA: rama 580, variante proprietary + GSP off (NO 595)
 
-La serie 595 tiene regresiones en Turing: parpadeos en Wayland, cursor invisible en Steam, pantalla negra al suspender.
+La serie 595 mantiene regresiones en Turing (verificado 2026-07: clocks de
+boost capados, pantallas negras y parpadeos en juegos, stutter en KDE Wayland).
+La rama 580 sigue siendo la estable — último punto: 580.173.02.
+
+**Variante proprietary en vez de open (cambio 2026-07-02):** el driver open
+fuerza el firmware GSP, que tiene stutter conocido en Turing con KDE Plasma
+(open-gpu-kernel-modules #777/#693: tirones al salir de idle hasta que la GPU
+sube de clocks). El proprietary permite `NVreg_EnableGpuFirmware=0`
+(`/etc/modprobe.d/nvidia-gsp.conf`), única vía documentada de eliminarlo.
+Configurable en `configs/packages.conf` (`NVIDIA_DRIVER_VARIANT`,
+`NVIDIA_DISABLE_GSP`) — con Secure Boot activo, valora volver a `open`.
 
 ### Wayland exclusivo
 

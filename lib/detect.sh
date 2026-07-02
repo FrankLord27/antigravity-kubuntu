@@ -11,6 +11,7 @@ export DETECT_SESSION_TYPE="" DETECT_NVIDIA_DRIVER_VER="" DETECT_NVIDIA_MODULE="
 export DETECT_NVIDIA_DEB_PKG="" DETECT_NVIDIA_IS_OPEN="" DETECT_NVIDIA_BRANCH=""
 export DETECT_NVIDIA_WAYLAND_OK="" DETECT_SUSPEND_CONFIGURED="" DETECT_VRAM_PRESERVE=""
 export DETECT_NTSYNC="" DETECT_CUDA_VER="" DETECT_DOCKER_RUNNING="" DETECT_DOCKER_GPU=""
+export DETECT_GSP_OFF=""
 export DETECT_NODE_VER="" DETECT_PNPM_VER="" DETECT_BTRFS=""
 
 detect_hardware() {
@@ -61,6 +62,8 @@ detect_nvidia() {
     $sok && DETECT_SUSPEND_CONFIGURED="yes" || DETECT_SUSPEND_CONFIGURED="no"
     grep -q 'NVreg_PreserveVideoMemoryAllocations=1' /etc/modprobe.d/nvidia-power.conf 2>/dev/null \
         && DETECT_VRAM_PRESERVE="yes" || DETECT_VRAM_PRESERVE="no"
+    grep -q 'NVreg_EnableGpuFirmware=0' /etc/modprobe.d/nvidia-gsp.conf 2>/dev/null \
+        && DETECT_GSP_OFF="yes" || DETECT_GSP_OFF="no"
     { [[ -d /sys/module/ntsync ]] || lsmod 2>/dev/null | grep -q ntsync; } && DETECT_NTSYNC="loaded" \
         || { modinfo ntsync &>/dev/null 2>&1 && DETECT_NTSYNC="available" || DETECT_NTSYNC="missing"; }
     command -v nvcc &>/dev/null && DETECT_CUDA_VER=$(nvcc --version 2>/dev/null | grep 'release' | awk '{print $6}' | tr -d ',') \
@@ -107,8 +110,11 @@ detect_harmony() {
         [[ -n "$vm" ]] && [[ "$vm" -lt 578 ]] && [[ "$vm" -gt 0 ]] && \
             HARMONY_WARNINGS+=("Driver $DETECT_NVIDIA_DRIVER_VER antiguo — actualiza a 580-open")
     fi
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]] && \
-        HARMONY_WARNINGS+=("Driver variante cerrada — recomendado -open para kernel 7.0")
+    # Cerrado + GSP off es elección deliberada (fix stutter Turing) — no advertir
+    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]] && [[ "$DETECT_GSP_OFF" != "yes" ]] && \
+        HARMONY_WARNINGS+=("Driver variante cerrada sin GSP off — decide variante en packages.conf")
+    [[ "$DETECT_NVIDIA_IS_OPEN" == "yes" ]] && [[ "$DETECT_GSP_OFF" == "yes" ]] && \
+        HARMONY_ISSUES+=("nvidia-gsp.conf presente con driver open — el módulo puede NO cargar (GSP es obligatorio en open)")
     [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && ! grep -q 'modeset=1' /etc/modprobe.d/nvidia-drm.conf 2>/dev/null && \
         HARMONY_ISSUES+=("nvidia-drm.modeset=1 no configurado via modprobe — Wayland no funcionará")
     grep -q 'nvidia-drm.modeset' /etc/default/grub 2>/dev/null && \
@@ -150,8 +156,8 @@ calculate_health_score() {
     # Crítico: driver NVIDIA no cargado
     [[ "$DETECT_NVIDIA_MODULE" == "missing" ]]  && d=$(( d + 20 ))
     [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]]  && d=$(( d + 10 ))
-    # Importante: variante y suspensión
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]]      && d=$(( d + 4 ))
+    # Importante: variante y suspensión (cerrado + GSP off es deliberado, no penaliza)
+    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]] && [[ "$DETECT_GSP_OFF" != "yes" ]] && d=$(( d + 4 ))
     [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 6 ))
     [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 3 ))
     # Docker es importante pero no crítico

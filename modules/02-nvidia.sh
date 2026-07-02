@@ -4,8 +4,11 @@
 #  GTX 1660 SUPER (Turing/TU116)
 #
 #  DECISIONES:
-#  • nvidia-driver-580-open — producción estable, NO 595 (regresiones Turing)
-#  • Módulos abiertos GSP — mejor integración kernel 7.0 y Secure Boot
+#  • Rama 580 — producción estable, NO 595 (regresiones Turing persisten en 595.84)
+#  • Variante configurable en packages.conf (2026-07-02: proprietary + GSP off)
+#    El driver open FUERZA firmware GSP → stutter conocido en Turing/KDE
+#    (open-gpu-kernel-modules #777/#693). El proprietary permite
+#    NVreg_EnableGpuFirmware=0, única vía documentada de eliminarlo.
 #  • X11 NO configurado — Kubuntu 26.04 es Wayland exclusivo
 #  • nvidia-drm via modprobe.d — NO GRUB (kernel 7.0)
 #  • Servicios suspensión + preservación VRAM — pantalla negra al despertar
@@ -16,14 +19,16 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
+source "${SCRIPT_DIR}/configs/packages.conf"
 
-readonly NVIDIA_TARGET_BRANCH="580"
-readonly NVIDIA_TARGET_PKG="nvidia-driver-${NVIDIA_TARGET_BRANCH}-open"
+readonly NVIDIA_TARGET_BRANCH="${NVIDIA_DRIVER_VERSION:-580}"
+readonly NVIDIA_TARGET_SUFFIX="${NVIDIA_PKG_SUFFIX-}"
+readonly NVIDIA_TARGET_PKG="nvidia-driver-${NVIDIA_TARGET_BRANCH}${NVIDIA_TARGET_SUFFIX}"
 readonly NVIDIA_MIN_VERSION=578
 readonly CUDA_VERSION="12-8"
 
 run_module_nvidia() {
-    ui_step "MÓDULO 02 — NVIDIA GTX 1660 SUPER (580-open)"
+    ui_step "MÓDULO 02 — NVIDIA GTX 1660 SUPER (${NVIDIA_TARGET_PKG})"
     ui_panel_start "Driver producción estable para Turing + Wayland + CUDA 12.8"
     export DEBIAN_FRONTEND=noninteractive
 
@@ -31,8 +36,9 @@ run_module_nvidia() {
     _show_current_state
 
     if _is_correct_driver_loaded; then
-        ui_ok "Driver 580-open ya instalado y funcionando"
+        ui_ok "Driver ${NVIDIA_TARGET_PKG} ya instalado y funcionando"
         ui_skip "Instalación del driver"
+        _configure_gsp
         _configure_wayland_kubuntu2604
         _configure_suspend_services
         _configure_vram_preservation
@@ -43,7 +49,8 @@ run_module_nvidia() {
     _remove_conflicting_drivers
     _check_run_installer
     _blacklist_nouveau
-    _install_nvidia_580_open
+    _install_nvidia_580
+    _configure_gsp
     _install_cuda_128
     _configure_wayland_kubuntu2604
     _configure_suspend_services
@@ -78,16 +85,17 @@ _is_correct_driver_loaded() {
     [[ "$DETECT_NVIDIA_MODULE" != "loaded" ]] && return 1
     local vm; vm=$(echo "$DETECT_NVIDIA_DRIVER_VER" | cut -d. -f1)
     [[ -z "$vm" ]] && return 1
-    [[ "$vm" -ge 580 ]] && [[ "$vm" -lt 590 ]] && is_deb_installed "nvidia-driver-${vm}-open"
+    [[ "$vm" -ge 580 ]] && [[ "$vm" -lt 590 ]] && is_deb_installed "nvidia-driver-${vm}${NVIDIA_TARGET_SUFFIX}"
 }
 
 _remove_conflicting_drivers() {
-    ui_info "Verificando drivers conflictivos..."
+    ui_info "Verificando drivers conflictivos (otra rama u otra variante)..."
     local installed found=false
     installed=$(dpkg -l 2>/dev/null | grep -E '^ii.*nvidia-driver-[0-9]+' | awk '{print $2}')
     for drv in $installed; do
-        local ver; ver=$(echo "$drv" | grep -oE '[0-9]+(-open)?$' | grep -oE '^[0-9]+')
-        if [[ "$ver" != "$NVIDIA_TARGET_BRANCH" ]]; then
+        # Conflictivo = cualquier nvidia-driver que no sea exactamente el objetivo
+        # (incluye misma rama con variante equivocada, ej. 580-open vs 580)
+        if [[ "$drv" != "$NVIDIA_TARGET_PKG" ]]; then
             ui_warn "Eliminando driver conflictivo: $drv"
             run_cmd 2 "Eliminar $drv" apt remove -y --purge "$drv" || true
             found=true
@@ -118,8 +126,8 @@ EOF'
     ui_ok "nouveau en blacklist"
 }
 
-_install_nvidia_580_open() {
-    ui_info "Instalando nvidia-driver-${NVIDIA_TARGET_BRANCH}-open..."
+_install_nvidia_580() {
+    ui_info "Instalando ${NVIDIA_TARGET_PKG}..."
     ui_warn "Puede tardar varios minutos — DKMS compilará el módulo. NO interrumpas."
 
     if ! dpkg --print-foreign-architectures 2>/dev/null | grep -q i386; then
@@ -128,8 +136,8 @@ _install_nvidia_580_open() {
     else ui_skip "i386 ya habilitado"; fi
 
     local pkgs=(
-        "nvidia-driver-${NVIDIA_TARGET_BRANCH}-open"
-        "nvidia-dkms-${NVIDIA_TARGET_BRANCH}-open"
+        "nvidia-driver-${NVIDIA_TARGET_BRANCH}${NVIDIA_TARGET_SUFFIX}"
+        "nvidia-dkms-${NVIDIA_TARGET_BRANCH}${NVIDIA_TARGET_SUFFIX}"
         "nvidia-utils-${NVIDIA_TARGET_BRANCH}"
         "nvidia-settings"
         "libnvidia-gl-${NVIDIA_TARGET_BRANCH}"
@@ -143,7 +151,31 @@ _install_nvidia_580_open() {
     for pkg in "${pkgs[@]}"; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
     done
-    ui_ok "nvidia-driver-${NVIDIA_TARGET_BRANCH}-open instalado"
+    ui_ok "${NVIDIA_TARGET_PKG} instalado"
+}
+
+_configure_gsp() {
+    local gf="/etc/modprobe.d/nvidia-gsp.conf"
+    if [[ "${NVIDIA_DRIVER_VARIANT:-open}" == "proprietary" ]] && [[ "${NVIDIA_DISABLE_GSP:-false}" == "true" ]]; then
+        if grep -q 'NVreg_EnableGpuFirmware=0' "$gf" 2>/dev/null; then
+            ui_skip "GSP ya desactivado"
+        else
+            run_cmd 2 "Desactivar firmware GSP (fix stutter Turing)" bash -c 'cat > /etc/modprobe.d/nvidia-gsp.conf << EOF
+# ANTIGRAVITY — GSP desactivado (solo driver proprietary)
+# Fix del stutter en Turing con KDE Plasma/juegos:
+# github.com/NVIDIA/open-gpu-kernel-modules issues #777 y #693
+options nvidia NVreg_EnableGpuFirmware=0
+EOF'
+            ui_ok "GSP desactivado — efectivo tras regenerar initramfs y reiniciar"
+        fi
+    else
+        # El driver open REQUIERE GSP: este archivo impediría cargar el módulo
+        if [[ -f "$gf" ]]; then
+            run_cmd 2 "Eliminar config GSP (incompatible con driver open)" rm -f "$gf"
+        else
+            ui_skip "GSP por defecto (variante open o NVIDIA_DISABLE_GSP=false)"
+        fi
+    fi
 }
 
 _install_cuda_128() {
