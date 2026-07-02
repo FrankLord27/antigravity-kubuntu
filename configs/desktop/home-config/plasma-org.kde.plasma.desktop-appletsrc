@@ -409,4 +409,4 @@ AppletOrder=86;87;88;89;90;91
 
 [ScreenMapping]
 itemsOnDisabledScreens=
-screenMapping=desktop:/godot.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/chrome-cmkncekebbebpfilplodngbpllndjkfo-Default.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/TeamViewer.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/Trucking Innovation_Control de Proyectos.pdf,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/chrome-hnpfjngllnobngcgfapefoaidbinmjnm-Default.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/net.lutris.the-evil-within-2-4.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680
+screenMapping=desktop:/net.lutris.the-evil-within-2-4.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/chrome-cmkncekebbebpfilplodngbpllndjkfo-Default.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/TeamViewer.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/Trucking Innovation_Control de Proyectos.pdf,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/chrome-hnpfjngllnobngcgfapefoaidbinmjnm-Default.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680,desktop:/godot.desktop,0,5288a118-b65f-4001-b9b5-c9465ffb3680
