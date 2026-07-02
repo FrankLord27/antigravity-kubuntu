@@ -30,7 +30,7 @@ sudo bash kubuntu-auto-setup.sh
 | --- | ----------------------- | -------------------------------------------------------------------------------- |
 | 0   | Diagnóstico del sistema | Hardware, drivers, logs de arranque, Health Score 0–100                          |
 | 1   | Sistema base            | `apt upgrade`, firmware, microcode Intel/AMD, sanitización de PPAs               |
-| 2   | Driver NVIDIA           | Driver 580-open (producción estable Turing), DKMS, Wayland                       |
+| 2   | Driver NVIDIA           | Driver 580 proprietary + GSP off (estable Turing), DKMS, Wayland                 |
 | 3   | Docker CE               | Docker Engine oficial + NVIDIA Container Toolkit (GPU en contenedores)           |
 | 4   | Stack de desarrollo     | Node.js LTS (fnm), pnpm, VS Code, Google Chrome, Zsh                             |
 | 5   | Gaming                  | Steam, Lutris, Wine, Vulkan, MangoHud, GameMode, ProtonUp-Qt                     |

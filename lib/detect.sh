@@ -2,7 +2,7 @@
 # =============================================================================
 #  KUBUNTU AUTO SETUP — lib/detect.sh  [Kubuntu 26.04 LTS]
 #  Detección hardware + estado sistema + 20 reglas de armonía
-#  Driver recomendado: 580-open | CUDA: 12.8 | Wayland exclusivo
+#  Driver recomendado: 580 proprietary (GSP off) | CUDA: 12.8 | Wayland exclusivo
 # =============================================================================
 export DETECT_GPU="" DETECT_GPU_ARCH="" DETECT_CPU="" DETECT_RAM_GB=""
 export DETECT_DISK_FS="" DETECT_DISK_FREE_GB="" DETECT_KERNEL=""

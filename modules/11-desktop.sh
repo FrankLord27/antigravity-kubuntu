@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY — modules/11-desktop.sh [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP — modules/11-desktop.sh [Kubuntu 26.04 LTS]
 #  Desktop Snapshot: backup/restore fiel de la configuración visual de KDE
 #
 #  BACKUP  : copia al repo (configs/desktop/) los archivos reales del
@@ -92,7 +92,7 @@ _desktop_backup() {
     lnf=$(grep -oP '^LookAndFeelPackage=\K.*' "${real_home}/.config/kdeglobals" 2>/dev/null | head -1)
     style=$(grep -oP '^widgetStyle=\K.*' "${real_home}/.config/kdeglobals" 2>/dev/null | head -1)
     cat > "${DESKTOP_BACKUP_DIR}/manifest.txt" << EOF
-# ANTIGRAVITY — Desktop Snapshot
+# KUBUNTU AUTO SETUP — Desktop Snapshot
 # Fecha        : $(date '+%Y-%m-%d %H:%M:%S')
 # Usuario      : ${real_user}
 # Plasma       : $(plasmashell --version 2>/dev/null || echo desconocida)
@@ -140,7 +140,7 @@ _desktop_restore() {
     fi
 
     # Respaldo de seguridad de la config actual antes de pisarla
-    local safety="${real_home}/.config/antigravity-pre-restore-$(date '+%Y%m%d-%H%M%S')"
+    local safety="${real_home}/.config/kubuntu-setup-pre-restore-$(date '+%Y%m%d-%H%M%S')"
     mkdir -p "$safety"
     local f count=0
     for f in "${DESKTOP_CONFIG_FILES[@]}"; do

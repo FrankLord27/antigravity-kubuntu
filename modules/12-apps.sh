@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY — modules/12-apps.sh [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP — modules/12-apps.sh [Kubuntu 26.04 LTS]
 #  Apps personales auditadas del sistema real (2026-07-02)
 #  Lee las listas de configs/packages.conf — comenta ahí lo que no quieras.
 # =============================================================================

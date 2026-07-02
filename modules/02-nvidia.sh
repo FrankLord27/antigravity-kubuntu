@@ -161,7 +161,7 @@ _configure_gsp() {
             ui_skip "GSP ya desactivado"
         else
             run_cmd 2 "Desactivar firmware GSP (fix stutter Turing)" bash -c 'cat > /etc/modprobe.d/nvidia-gsp.conf << EOF
-# ANTIGRAVITY — GSP desactivado (solo driver proprietary)
+# KUBUNTU AUTO SETUP — GSP desactivado (solo driver proprietary)
 # Fix del stutter en Turing con KDE Plasma/juegos:
 # github.com/NVIDIA/open-gpu-kernel-modules issues #777 y #693
 options nvidia NVreg_EnableGpuFirmware=0
