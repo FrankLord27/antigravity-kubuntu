@@ -139,7 +139,6 @@ _install_nvidia_580_open() {
         "libnvidia-decode-${NVIDIA_TARGET_BRANCH}"
         "libnvidia-encode-${NVIDIA_TARGET_BRANCH}"
         "libnvidia-fbc1-${NVIDIA_TARGET_BRANCH}"
-        "xserver-xorg-video-nvidia-${NVIDIA_TARGET_BRANCH}"
     )
     for pkg in "${pkgs[@]}"; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
