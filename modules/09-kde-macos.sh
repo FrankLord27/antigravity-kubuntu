@@ -119,14 +119,13 @@ _configure_spanish() {
     run_cmd 1 "Generar locale es_ES.UTF-8" locale-gen es_ES.UTF-8 2>/dev/null || true
     run_cmd 1 "Generar locale es_DO.UTF-8" locale-gen es_DO.UTF-8 2>/dev/null || true
 
-    [[ -f /etc/locale.conf ]] && grep -q 'es_' /etc/locale.conf 2>/dev/null && ui_skip "Locale español ya configurado" || {
-        run_cmd 1 "Configurar locale español" bash -c 'cat > /etc/locale.conf << EOF
-LANG=es_ES.UTF-8
-LANGUAGE=es_ES:es
-LC_ALL=es_ES.UTF-8
-EOF'
+    # Ubuntu lee /etc/default/locale (via update-locale) — NO /etc/locale.conf (eso es Arch)
+    if grep -q 'LANG=es_' /etc/default/locale 2>/dev/null; then
+        ui_skip "Locale español ya configurado"
+    else
+        run_cmd 1 "Configurar locale español" update-locale LANG=es_ES.UTF-8 LANGUAGE=es_ES:es
         ui_ok "Locale configurado en español"
-    }
+    fi
 
     local real_user="${SUDO_USER:-$USER}"
     local uid; uid=$(id -u "$real_user")
@@ -141,8 +140,16 @@ run_module_kde_macos() {
     ui_step "MÓDULO 09 — KDE MACOS LOOK"
     ui_panel_start "KDE Plasma 6 (Paneles, KWin, Idioma)"
     local real_user="${SUDO_USER:-$USER}"
-    
-    _configure_kde_macos "$real_user"
+
+    # Si existe un Desktop Snapshot (módulo 11), ese restaura el escritorio REAL
+    # (paneles, Papirus-Dark, Utterly-Round-Dark, fuentes) — aquí solo el idioma.
+    if [[ -f "${SCRIPT_DIR}/configs/desktop/manifest.txt" ]]; then
+        ui_info "Backup de escritorio detectado — se omite el look genérico"
+        ui_warn "Ejecuta el módulo 11 para restaurar tu escritorio real"
+        ui_skip "Paneles/KWin genéricos (los restaura el módulo 11)"
+    else
+        _configure_kde_macos "$real_user"
+    fi
     _configure_spanish
     
     ui_panel_end; ui_ok "Módulo 09 completado"

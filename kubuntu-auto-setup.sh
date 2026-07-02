@@ -51,6 +51,8 @@ declare -A MODULE_NAME=(
     [8]="ZSH + Powerlevel10k"
     [9]="KDE macOS Look + Idioma Español"
     [10]="Git Setup (identidad + SSH + aliases)"
+    [11]="Desktop Snapshot (backup/restore visual KDE)"
+    [12]="Apps personales (apt + snap + flatpak)"
 )
 
 declare -A MODULE_FILE=(
@@ -65,6 +67,8 @@ declare -A MODULE_FILE=(
     [8]="${SCRIPT_DIR}/modules/08-zsh.sh"
     [9]="${SCRIPT_DIR}/modules/09-kde-macos.sh"
     [10]="${SCRIPT_DIR}/modules/10-git.sh"
+    [11]="${SCRIPT_DIR}/modules/11-desktop.sh"
+    [12]="${SCRIPT_DIR}/modules/12-apps.sh"
 )
 
 declare -A MODULE_FUNC=(
@@ -79,9 +83,11 @@ declare -A MODULE_FUNC=(
     [8]="run_module_zsh"
     [9]="run_module_kde_macos"
     [10]="run_module_git"
+    [11]="run_module_desktop"
+    [12]="run_module_apps"
 )
 
-FULL_INSTALL_ORDER=(1 2 3 4 10 5 6 8 9 7)
+FULL_INSTALL_ORDER=(1 2 3 4 10 5 6 8 9 11 12 7)
 
 _module_status() {
     local real_home; real_home=$(eval echo "~${SUDO_USER:-$USER}")
@@ -99,6 +105,8 @@ _module_status() {
         10) local ru="${SUDO_USER:-$USER}"
             local gn; gn=$(sudo -u "$ru" git config --global user.name 2>/dev/null || echo "")
             [[ -n "$gn" ]] && echo "OK" || echo "pendiente" ;;
+        11) [[ -f "${SCRIPT_DIR}/configs/desktop/manifest.txt" ]] && echo "backup listo" || echo "sin backup" ;;
+        12) is_deb_installed gimp && echo "OK" || echo "pendiente" ;;
     esac
 }
 
@@ -127,6 +135,8 @@ _execute_full_install() {
         gum confirm "¿Iniciar instalación completa?" --affirmative="Sí" --negative="Cancelar" < /dev/tty 2>/dev/null || return
     else ui_confirm "¿Iniciar instalación completa?" || return; fi
     echo ""; local total="${#FULL_INSTALL_ORDER[@]}" current=0
+    # En instalación completa el módulo 11 restaura el backup sin preguntar
+    export AG_DESKTOP_MODE=restore
     for idx in "${FULL_INSTALL_ORDER[@]}"; do
         (( current++ )) || true
         ui_progress "$current" "$total" "${MODULE_NAME[$idx]}"; echo ""
@@ -134,6 +144,7 @@ _execute_full_install() {
         _run_module "$idx" || ui_warn "Módulo $idx terminó con errores — continuando"
         echo ""
     done
+    unset AG_DESKTOP_MODE
     ui_ok "Instalación completa finalizada"; ui_summary; ui_pause
 }
 
@@ -141,7 +152,7 @@ _tui_gum() {
     while true; do
         ui_banner
         local options=()
-        for i in 0 1 2 3 4 5 6 7 8 9 10; do
+        for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do
             local st; st=$(_module_status "$i")
             local icon="○"
             [[ "$st" == "OK" ]] && icon="${C_GREEN}✓${C_RESET}"
@@ -161,7 +172,7 @@ _tui_gum() {
         fi
         local choice; choice=$(echo "$selected" | grep -oP '^\[(\w+)\]' | tr -d '[]')
         case "${choice,,}" in
-            [0-9]|10) _execute_module_flow "$choice" ;;
+            [0-9]|1[0-2]) _execute_module_flow "$choice" ;;
             a)        _execute_full_install ;;
             m)        _tui_multiselect ;;
             q)        break ;;
@@ -173,7 +184,7 @@ _tui_multiselect() {
     ui_banner
     echo -e "${C_BOLD}  ESPACIO = marcar  •  ENTER = confirmar${C_RESET}"; echo ""
     local options=()
-    for i in 0 1 2 3 4 5 6 7 8 9 10; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
+    for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
     local selected_raw
     selected_raw=$(gum choose --no-limit \
             --selected-prefix="  ● " --unselected-prefix="  ○ " \
@@ -202,7 +213,7 @@ _tui_numeric() {
     while true; do
         ui_banner
         echo -e "${C_BOLD}  MÓDULOS DISPONIBLES${C_RESET}"; echo ""
-        for i in 0 1 2 3 4 5 6 7 8 9 10; do
+        for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do
             local st; st=$(_module_status "$i")
             local sc="$C_GRAY" si=" "
             [[ "$st" == "OK" ]] && sc="$C_GREEN" && si="$ICON_OK"
@@ -213,7 +224,7 @@ _tui_numeric() {
         echo -e "  ${C_CYAN}[Q] ${C_RESET}  Salir"; echo ""
         echo -ne "  ${C_BOLD}Selecciona opción: ${C_RESET}"; read -r choice
         case "${choice,,}" in
-            [0-9]|10) _execute_module_flow "$choice" ;;
+            [0-9]|1[0-2]) _execute_module_flow "$choice" ;;
             a)        _execute_full_install ;;
             q)        echo ""; ui_info "Saliendo..."; break ;;
             *)        ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
@@ -234,7 +245,8 @@ main() {
     echo -e "  ${C_DIM}NTSYNC : ${DETECT_NTSYNC} | Suspensión: ${DETECT_SUSPEND_CONFIGURED} | VRAM: ${DETECT_VRAM_PRESERVE}${C_RESET}"
     echo ""; sleep 2
 
-    _tui_numeric
+    # Bug corregido: antes siempre se usaba el modo numérico aunque gum estuviera instalado
+    if $GUM_AVAILABLE && command -v gum &>/dev/null; then _tui_gum; else _tui_numeric; fi
 
     echo ""; ui_ok "Kubuntu Auto Setup Bootstrap finalizado."
     echo -e "  ${C_DIM}Log: ${AG_LOG_FILE}${C_RESET}"; echo ""
