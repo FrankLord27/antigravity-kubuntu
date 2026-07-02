@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/05-gaming.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/05-gaming.sh [Kubuntu 26.04 LTS]
 # Gaming: Steam + Lutris + Wine + Vulkan + MangoHud + GameMode + NTSYNC
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,7 +60,7 @@ run_module_gaming() {
     local mango_dir; mango_dir="$(eval echo "~$real_user")/.config/MangoHud"
     mkdir -p "$mango_dir"
     [[ ! -f "${mango_dir}/MangoHud.conf" ]] && cat > "${mango_dir}/MangoHud.conf" << 'EOF'
-# MangoHud — ANTIGRAVITY (GTX 1660 SUPER + i5-10400F)
+# MangoHud — KUBUNTU AUTO SETUP (GTX 1660 SUPER + i5-10400F)
 fps
 gpu_stats
 gpu_temp

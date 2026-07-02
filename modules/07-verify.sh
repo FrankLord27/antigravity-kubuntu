@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/07-verify.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/07-verify.sh [Kubuntu 26.04 LTS]
 # Verificación completa post-instalación + Health Score final
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -205,7 +205,7 @@ _show_final_score() {
     local bar; bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
     echo ""
     echo -e "${C_BOLD}  ╔══════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_BOLD}  ║         HEALTH SCORE FINAL — ANTIGRAVITY            ║${C_RESET}"
+    echo -e "${C_BOLD}  ║         HEALTH SCORE FINAL — KUBUNTU AUTO SETUP            ║${C_RESET}"
     echo -e "${C_BOLD}  ╠══════════════════════════════════════════════════════╣${C_RESET}"
     echo -e "  ║  ${bar}"
     printf  "  ║  ${color}${C_BOLD}%-52s${C_RESET}║\n" "${score}%  —  ${label}"

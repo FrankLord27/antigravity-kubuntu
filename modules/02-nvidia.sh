@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  ANTIGRAVITY — modules/02-nvidia.sh [Kubuntu 26.04 LTS]
+#  KUBUNTU AUTO SETUP — modules/02-nvidia.sh [Kubuntu 26.04 LTS]
 #  GTX 1660 SUPER (Turing/TU116)
 #
 #  DECISIONES:
@@ -204,11 +204,11 @@ _install_cuda_128() {
     local real_user="${SUDO_USER:-$USER}"
     local real_home; real_home=$(eval echo "~$real_user")
     local snippet='
-# CUDA 12.8 — ANTIGRAVITY
+# CUDA 12.8 — KUBUNTU AUTO SETUP
 export PATH="/usr/local/cuda/bin:$PATH"
 export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"'
     for rc in "${real_home}/.bashrc" "${real_home}/.zshrc"; do
-        [[ -f "$rc" ]] && ! grep -q 'CUDA.*ANTIGRAVITY' "$rc" && echo "$snippet" >> "$rc" \
+        [[ -f "$rc" ]] && ! grep -q 'CUDA.*KUBUNTU AUTO SETUP' "$rc" && echo "$snippet" >> "$rc" \
             && ui_ok "CUDA PATH → $(basename $rc)" || true
     done
     ui_ok "CUDA 12.8 instalado"
@@ -221,7 +221,7 @@ _configure_wayland_kubuntu2604() {
     local drmf="/etc/modprobe.d/nvidia-drm.conf"
     if [[ ! -f "$drmf" ]] || ! grep -q 'modeset=1' "$drmf" 2>/dev/null; then
         run_cmd 2 "Configurar nvidia-drm modeset" bash -c 'cat > /etc/modprobe.d/nvidia-drm.conf << EOF
-# ANTIGRAVITY — NVIDIA DRM para Wayland Kubuntu 26.04
+# KUBUNTU AUTO SETUP — NVIDIA DRM para Wayland Kubuntu 26.04
 # Kernel 7.0 — via modprobe.d, NO via GRUB
 options nvidia-drm modeset=1
 options nvidia-drm fbdev=1
@@ -282,7 +282,7 @@ _configure_vram_preservation() {
     [[ -f "$pf" ]] && grep -q 'NVreg_PreserveVideoMemoryAllocations' "$pf" 2>/dev/null \
         && { ui_skip "VRAM preservation ya configurada"; return; }
     run_cmd 2 "Crear nvidia-power.conf" bash -c 'cat > /etc/modprobe.d/nvidia-power.conf << EOF
-# ANTIGRAVITY — Preservación VRAM para suspensión/hibernate
+# KUBUNTU AUTO SETUP — Preservación VRAM para suspensión/hibernate
 # Solución documentada para pantalla negra en Turing (GTX 1660 SUPER)
 options nvidia NVreg_PreserveVideoMemoryAllocations=1
 options nvidia NVreg_TemporaryFilePath=/var/tmp

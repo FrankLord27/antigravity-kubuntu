@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/06-system-optimize.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/06-system-optimize.sh [Kubuntu 26.04 LTS]
 # Optimización: swappiness, ZRAM, TRIM, PipeWire, Bluetooth, Timeshift
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,9 +13,9 @@ run_module_optimize() {
     local real_user="${SUDO_USER:-$USER}"
 
     ui_info "Configurando sysctl..."
-    if [[ ! -f /etc/sysctl.d/99-antigravity.conf ]]; then
-        run_cmd 2 "Crear sysctl antigravity" bash -c 'cat > /etc/sysctl.d/99-antigravity.conf << EOF
-# ANTIGRAVITY — sysctl Kubuntu 26.04
+    if [[ ! -f /etc/sysctl.d/99-kubuntu-auto-setup.conf ]]; then
+        run_cmd 2 "Crear sysctl kubuntu-auto-setup" bash -c 'cat > /etc/sysctl.d/99-kubuntu-auto-setup.conf << EOF
+# KUBUNTU AUTO SETUP — sysctl Kubuntu 26.04
 vm.swappiness = 10
 vm.dirty_ratio = 15
 vm.dirty_background_ratio = 5

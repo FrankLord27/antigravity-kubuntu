@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ANTIGRAVITY — modules/03-docker.sh [Kubuntu 26.04 LTS]
+# KUBUNTU AUTO SETUP — modules/03-docker.sh [Kubuntu 26.04 LTS]
 # Docker CE oficial (NO snap, NO apt Ubuntu) + NVIDIA Container Toolkit
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -59,6 +59,7 @@ run_module_docker() {
 
     _configure_docker_daemon
     _install_nvidia_container_toolkit
+    _install_portainer_ce
 
     is_service_active docker && ui_ok "Docker CE activo: $(docker --version 2>/dev/null)" \
         || ui_fail "Docker no activo — journalctl -xe | grep docker"
@@ -107,6 +108,25 @@ _install_nvidia_container_toolkit() {
         ui_warn "nvidia-ctk no disponible aún — ejecuta tras reinicio:"
         ui_warn "  sudo nvidia-ctk runtime configure --runtime=docker"
         ui_warn "  sudo systemctl restart docker"
+    fi
+}
+
+_install_portainer_ce() {
+    ui_info "Verificando Portainer CE..."
+    if ! is_service_active docker; then
+        ui_warn "Docker no activo, saltando instalación de Portainer"
+        return
+    fi
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^portainer$'; then
+        ui_skip "Portainer CE ya instalado"
+    else
+        ui_info "Instalando Portainer CE..."
+        run_cmd 2 "Crear volumen portainer_data" docker volume create portainer_data
+        run_cmd 2 "Iniciar contenedor portainer" docker run -d -p 8000:8000 -p 9443:9443 \
+            --name portainer --restart=always \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v portainer_data:/data portainer/portainer-ce:latest
+        ui_ok "Portainer CE instalado (Acceso en https://localhost:9443)"
     fi
 }
 
