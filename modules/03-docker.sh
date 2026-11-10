@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# KUBUNTU AUTO SETUP — modules/03-docker.sh [Kubuntu 26.04 LTS]
-# Docker CE oficial (NO snap, NO apt Ubuntu) + NVIDIA Container Toolkit
+# AUTO SETUP — modules/03-docker.sh [Debian 13 / Ubuntu 26.04]
+# Docker CE oficial (repo de Docker para la distro detectada) + NVIDIA Container Toolkit si hay GPU
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
 run_module_docker() {
-    ui_step "MÓDULO 03 — DOCKER CE + NVIDIA GPU"
-    ui_panel_start "Docker CE oficial + NVIDIA Container Toolkit"
+    ui_step "MÓDULO 03 — DOCKER CE"
+    ui_panel_start "Docker CE oficial (+ NVIDIA Container Toolkit si hay GPU)"
     export DEBIAN_FRONTEND=noninteractive
     local real_user="${SUDO_USER:-$USER}"
 
-    detect_docker
+    detect_hardware; detect_docker
     if [[ "$DETECT_DOCKER_RUNNING" == "yes" ]]; then
         ui_skip "Docker ya activo ($(docker --version 2>/dev/null))"
         _configure_docker_daemon
@@ -25,23 +25,22 @@ run_module_docker() {
         is_deb_installed "$pkg" && run_cmd 1 "Eliminar $pkg" apt remove -y "$pkg" || true
     done
 
-    # Eliminar snap Docker si existe
-    snap list docker &>/dev/null 2>&1 && {
+    # Eliminar snap Docker si existe (solo Ubuntu)
+    command -v snap &>/dev/null && snap list docker &>/dev/null 2>&1 && {
         ui_warn "Docker Snap detectado — eliminando (conflicto con Docker CE)"
         run_cmd 2 "Eliminar Docker snap" snap remove docker
     } || true
 
-    ui_info "Configurando repo oficial Docker CE..."
+    ui_info "Configurando repo oficial Docker CE (${DETECT_DISTRO})..."
     if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
         run_cmd 3 "Crear keyrings dir" install -m 0755 -d /etc/apt/keyrings
         run_cmd 3 "GPG key Docker" bash -c \
-            'curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-            -o /etc/apt/keyrings/docker.asc && chmod a+r /etc/apt/keyrings/docker.asc'
+            "curl -fsSL https://download.docker.com/linux/${DETECT_DISTRO}/gpg \
+            -o /etc/apt/keyrings/docker.asc && chmod a+r /etc/apt/keyrings/docker.asc"
         run_cmd 3 "Repo Docker CE" bash -c \
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-            https://download.docker.com/linux/ubuntu \
-            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-            > /etc/apt/sources.list.d/docker.list'
+            "echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+            https://download.docker.com/linux/${DETECT_DISTRO} ${DETECT_OS_CODENAME} stable\" \
+            > /etc/apt/sources.list.d/docker.list"
         run_cmd 3 "apt update post-Docker" apt update
     else ui_skip "Repo Docker CE ya configurado"; fi
 
@@ -84,6 +83,7 @@ EOF'
 }
 
 _install_nvidia_container_toolkit() {
+    has_nvidia || { ui_skip "NVIDIA Container Toolkit (sin GPU NVIDIA)"; return 0; }
     ui_info "Instalando NVIDIA Container Toolkit..."
     if is_deb_installed nvidia-container-toolkit; then
         ui_skip "NVIDIA Container Toolkit ya instalado"

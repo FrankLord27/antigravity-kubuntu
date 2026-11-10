@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP BOOTSTRAP — Entrada Principal [Kubuntu 26.04 LTS]
-#  GTX 1660 SUPER • i5-10400F • Docker + IA • Gaming • Dev
-#  Uso: sudo bash kubuntu-auto-setup.sh
+#  AUTO SETUP — Entrada principal  [Debian 13 / Ubuntu 26.04]
+#  Uso:  sudo bash setup.sh            → menú interactivo
+#        sudo bash setup.sh --auto     → instalación completa sin preguntas
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,49 +11,46 @@ source "${SCRIPT_DIR}/lib/detect.sh"
 
 export GUM_AVAILABLE=true
 export DEBIAN_FRONTEND=noninteractive
+AUTO_MODE=false
+[[ "${1:-}" == "--auto" ]] && AUTO_MODE=true
 
 _preflight() {
-    [[ $EUID -ne 0 ]] && { echo ""; echo "  ERROR: sudo bash kubuntu-auto-setup.sh"; echo ""; exit 1; }
-    ping -c 1 -W 3 8.8.8.8 &>/dev/null || { echo ""; echo "  ERROR: Sin internet."; echo ""; exit 1; }
-    source /etc/os-release 2>/dev/null
-    [[ "$ID" != "ubuntu" ]] && [[ "$ID_LIKE" != *"ubuntu"* ]] && {
-        echo "  ADVERTENCIA: Optimizado para Kubuntu/Ubuntu."
+    [[ $EUID -ne 0 ]] && { echo ""; echo "  ERROR: sudo bash setup.sh"; echo ""; exit 1; }
+    ping -c 1 -W 3 1.1.1.1 &>/dev/null || { echo ""; echo "  ERROR: Sin internet."; echo ""; exit 1; }
+    detect_distro
+    if [[ "$DETECT_DISTRO" == "otra" ]]; then
+        echo "  ADVERTENCIA: Este script está pensado para Debian o Ubuntu."
+        $AUTO_MODE && exit 1
         echo -ne "  ¿Continuar? [s/N]: "; read -r ans; [[ "$ans" =~ ^[sS]$ ]] || exit 0
-    }
+    fi
     command -v apt &>/dev/null || { echo "  ERROR: apt no encontrado."; exit 1; }
 }
 
 _ensure_gum() {
+    $AUTO_MODE && { GUM_AVAILABLE=false; return 0; }
     command -v gum &>/dev/null && return 0
-    echo -e "\n${C_CYAN}  Instalando gum (TUI)...${C_RESET}"
-    if curl -fsSL https://repo.charm.sh/apt/gpg.key \
-        | gpg --dearmor -o /usr/share/keyrings/charm.gpg &>/dev/null 2>&1; then
-        echo "deb [signed-by=/usr/share/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
-            > /etc/apt/sources.list.d/charm.list
-        apt update -qq &>/dev/null && apt install -y gum &>/dev/null && return 0
-    fi
+    echo -e "\n${C_CYAN}  Instalando gum (menú)...${C_RESET}"
     local tmp; tmp=$(mktemp -d)
     curl -sL "https://github.com/charmbracelet/gum/releases/download/v0.14.1/gum_0.14.1_Linux_x86_64.tar.gz" \
         -o "${tmp}/gum.tar.gz" 2>/dev/null && tar -xzf "${tmp}/gum.tar.gz" -C "$tmp" 2>/dev/null \
-        && install -m 755 "${tmp}/gum" /usr/local/bin/gum 2>/dev/null && rm -rf "$tmp"
+        && install -m 755 "${tmp}/gum" /usr/local/bin/gum 2>/dev/null; rm -rf "$tmp"
     command -v gum &>/dev/null || { echo -e "${C_YELLOW}  gum no disponible — modo numérico${C_RESET}"; GUM_AVAILABLE=false; }
 }
 
 declare -A MODULE_NAME=(
     [0]="Diagnóstico del sistema"
-    [1]="Sistema base (apt + firmware + microcode)"
-    [2]="Driver NVIDIA 580-open (producción estable Turing)"
-    [3]="Docker CE + NVIDIA Container Toolkit"
-    [4]="Stack de desarrollo (Node + pnpm + VS Code + Chrome + Zsh)"
-    [5]="Gaming (Steam + Lutris + Vulkan + MangoHud)"
-    [6]="Optimización (ZRAM + TRIM + PipeWire + Timeshift)"
+    [1]="Sistema base (apt + repos + firmware + microcode)"
+    [2]="Driver NVIDIA (solo si hay GPU NVIDIA)"
+    [3]="Docker CE (+ GPU si hay NVIDIA)"
+    [4]="Desarrollo (Node 26 + pnpm + VS Code + Chrome + IA + Orca)"
+    [5]="Gaming (Steam + Lutris + Vulkan + MangoHud) — opcional"
+    [6]="Optimización del sistema (ZRAM, sysctl, servicios) — opcional"
     [7]="Verificación final del sistema"
     [8]="ZSH + Powerlevel10k"
-    [9]="KDE macOS Look + Idioma Español"
-    [10]="Git Setup (identidad + SSH + aliases)"
-    [11]="Desktop Snapshot (backup/restore visual KDE)"
-    [12]="Apps personales (apt + snap + flatpak)"
+    [10]="Git Setup (identidad + SSH + gh)"
+    [12]="Apps personales (apt + flatpak)"
 )
+MODULE_IDS=(0 1 2 3 4 5 6 7 8 10 12)
 
 declare -A MODULE_FILE=(
     [0]="${SCRIPT_DIR}/modules/00-diagnostics.sh"
@@ -65,9 +62,7 @@ declare -A MODULE_FILE=(
     [6]="${SCRIPT_DIR}/modules/06-system-optimize.sh"
     [7]="${SCRIPT_DIR}/modules/07-verify.sh"
     [8]="${SCRIPT_DIR}/modules/08-zsh.sh"
-    [9]="${SCRIPT_DIR}/modules/09-kde-macos.sh"
     [10]="${SCRIPT_DIR}/modules/10-git.sh"
-    [11]="${SCRIPT_DIR}/modules/11-desktop.sh"
     [12]="${SCRIPT_DIR}/modules/12-apps.sh"
 )
 
@@ -81,37 +76,40 @@ declare -A MODULE_FUNC=(
     [6]="run_module_optimize"
     [7]="run_module_verify"
     [8]="run_module_zsh"
-    [9]="run_module_kde_macos"
     [10]="run_module_git"
-    [11]="run_module_desktop"
     [12]="run_module_apps"
 )
 
-FULL_INSTALL_ORDER=(1 2 3 4 10 5 6 8 9 11 12 7)
+# Instalación completa: solo programas. Sin gaming (5) ni ajustes del sistema (6).
+# NVIDIA (2) se añade solo si se detecta GPU NVIDIA.
+_full_install_order() {
+    local order=(1)
+    has_nvidia && order+=(2)
+    order+=(3 4 10 8 12 7)
+    echo "${order[@]}"
+}
 
 _module_status() {
     local real_home; real_home=$(eval echo "~${SUDO_USER:-$USER}")
     case "$1" in
         0) echo "diagnóstico" ;;
         1) is_deb_installed build-essential && echo "OK" || echo "pendiente" ;;
-        2) lsmod 2>/dev/null | grep -q '^nvidia ' && echo "OK" || echo "pendiente" ;;
+        2) has_nvidia || { echo "no aplica"; return; }
+           lsmod 2>/dev/null | grep -q '^nvidia ' && echo "OK" || echo "pendiente" ;;
         3) is_service_active docker && echo "OK" || echo "pendiente" ;;
-        4) [[ -d "${real_home}/.local/share/fnm" ]] && echo "OK" || echo "pendiente" ;;
+        4) [[ -s "${real_home}/.nvm/nvm.sh" ]] && echo "OK" || echo "pendiente" ;;
         5) { is_deb_installed steam-installer || is_deb_installed steam; } && echo "OK" || echo "pendiente" ;;
-        6) [[ -f /etc/sysctl.d/99-kubuntu-auto-setup.conf ]] && echo "OK" || echo "pendiente" ;;
+        6) [[ -f /etc/sysctl.d/99-auto-setup.conf ]] && echo "OK" || echo "pendiente" ;;
         7) echo "verificar" ;;
         8) [[ -d "${real_home}/.oh-my-zsh" ]] && echo "OK" || echo "pendiente" ;;
-        9) [[ -f "${real_home}/.config/plasma-localerc" ]] && grep -q "es_ES" "${real_home}/.config/plasma-localerc" 2>/dev/null && echo "OK" || echo "pendiente" ;;
-        10) local ru="${SUDO_USER:-$USER}"
-            local gn; gn=$(sudo -u "$ru" git config --global user.name 2>/dev/null || echo "")
+        10) local gn; gn=$(sudo -u "${SUDO_USER:-$USER}" git config --global user.name 2>/dev/null || echo "")
             [[ -n "$gn" ]] && echo "OK" || echo "pendiente" ;;
-        11) [[ -f "${SCRIPT_DIR}/configs/desktop/manifest.txt" ]] && echo "backup listo" || echo "sin backup" ;;
         12) is_deb_installed gimp && echo "OK" || echo "pendiente" ;;
     esac
 }
 
 _run_module() {
-    local idx="$1" file="${MODULE_FILE[$1]}" func="${MODULE_FUNC[$1]}"
+    local file="${MODULE_FILE[$1]}" func="${MODULE_FUNC[$1]}"
     [[ ! -f "$file" ]] && { ui_fail "Módulo no encontrado: $file"; return 1; }
     # shellcheck disable=SC1090
     source "$file"
@@ -127,55 +125,51 @@ _execute_module_flow() {
 }
 
 _execute_full_install() {
-    echo ""; ui_step "INSTALACIÓN COMPLETA — KUBUNTU 26.04 LTS"; echo ""
-    echo -e "  Módulos en orden:"; for idx in "${FULL_INSTALL_ORDER[@]}"; do
-        echo -e "    ${C_CYAN}[${idx}]${C_RESET} ${MODULE_NAME[$idx]}"
-    done; echo ""
-    if $GUM_AVAILABLE; then
-        gum confirm "¿Iniciar instalación completa?" --affirmative="Sí" --negative="Cancelar" < /dev/tty 2>/dev/null || return
-    else ui_confirm "¿Iniciar instalación completa?" || return; fi
-    echo ""; local total="${#FULL_INSTALL_ORDER[@]}" current=0
-    # En instalación completa el módulo 11 restaura el backup sin preguntar
-    export AG_DESKTOP_MODE=restore
-    for idx in "${FULL_INSTALL_ORDER[@]}"; do
+    local order; read -ra order <<< "$(_full_install_order)"
+    echo ""; ui_step "INSTALACIÓN COMPLETA — ${DETECT_DISTRO^} ${DETECT_OS_VER}"; echo ""
+    echo -e "  Módulos en orden:"
+    for idx in "${order[@]}"; do echo -e "    ${C_CYAN}[${idx}]${C_RESET} ${MODULE_NAME[$idx]}"; done; echo ""
+    if ! $AUTO_MODE; then
+        if $GUM_AVAILABLE; then
+            gum confirm "¿Iniciar instalación completa?" --affirmative="Sí" --negative="Cancelar" < /dev/tty 2>/dev/null || return
+        else ui_confirm "¿Iniciar instalación completa?" || return; fi
+    fi
+    echo ""; local total="${#order[@]}" current=0
+    for idx in "${order[@]}"; do
         (( current++ )) || true
         ui_progress "$current" "$total" "${MODULE_NAME[$idx]}"; echo ""
         ui_step "[$current/$total] ${MODULE_NAME[$idx]}"
         _run_module "$idx" || ui_warn "Módulo $idx terminó con errores — continuando"
         echo ""
     done
-    unset AG_DESKTOP_MODE
-    ui_ok "Instalación completa finalizada"; ui_summary; ui_pause
+    ui_ok "Instalación completa finalizada"; ui_summary
+    $AUTO_MODE || ui_pause
 }
 
 _tui_gum() {
     while true; do
         ui_banner
         local options=()
-        for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do
-            local st; st=$(_module_status "$i")
-            local icon="○"
-            [[ "$st" == "OK" ]] && icon="${C_GREEN}✓${C_RESET}"
-            options+=("[${i}] ${MODULE_NAME[$i]}  (${st})")
+        for i in "${MODULE_IDS[@]}"; do
+            options+=("[${i}] ${MODULE_NAME[$i]}  ($(_module_status "$i"))")
         done
         options+=("────────────────────────────────────────────────")
-        options+=("[A] Instalación completa recomendada")
+        options+=("[A] Instalación completa (programas, sin gaming ni optimización)")
         options+=("[M] Seleccionar módulos (multi-select)")
         options+=("[Q] Salir")
         local selected
         selected=$(gum choose --cursor="  ▶ " --height=18 \
-            --header="  KUBUNTU AUTO SETUP — Kubuntu 26.04 LTS  •  ↑↓ ENTER para seleccionar" \
+            --header="  AUTO SETUP — ${DETECT_DISTRO^} ${DETECT_OS_VER}  •  ↑↓ ENTER para seleccionar" \
             "${options[@]}" < /dev/tty 2>/dev/tty) || true
         if [[ -z "$selected" ]]; then
-            ui_warn "gum no responde — cambiando a modo numérico"
-            _tui_numeric; return
+            ui_warn "gum no responde — cambiando a modo numérico"; _tui_numeric; return
         fi
         local choice; choice=$(echo "$selected" | grep -oP '^\[(\w+)\]' | tr -d '[]')
         case "${choice,,}" in
-            [0-9]|1[0-2]) _execute_module_flow "$choice" ;;
-            a)        _execute_full_install ;;
-            m)        _tui_multiselect ;;
-            q)        break ;;
+            [0-9]|1[02]) _execute_module_flow "$choice" ;;
+            a) _execute_full_install ;;
+            m) _tui_multiselect ;;
+            q) break ;;
         esac
     done
 }
@@ -184,7 +178,7 @@ _tui_multiselect() {
     ui_banner
     echo -e "${C_BOLD}  ESPACIO = marcar  •  ENTER = confirmar${C_RESET}"; echo ""
     local options=()
-    for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
+    for i in "${MODULE_IDS[@]}"; do options+=("[${i}] ${MODULE_NAME[$i]}"); done
     local selected_raw
     selected_raw=$(gum choose --no-limit \
             --selected-prefix="  ● " --unselected-prefix="  ○ " \
@@ -213,21 +207,20 @@ _tui_numeric() {
     while true; do
         ui_banner
         echo -e "${C_BOLD}  MÓDULOS DISPONIBLES${C_RESET}"; echo ""
-        for i in 0 1 2 3 4 5 6 7 8 9 10 11 12; do
+        for i in "${MODULE_IDS[@]}"; do
             local st; st=$(_module_status "$i")
             local sc="$C_GRAY" si=" "
             [[ "$st" == "OK" ]] && sc="$C_GREEN" && si="$ICON_OK"
-            printf "  ${C_CYAN}[%-2s]${C_RESET}  %-50s ${sc}%s (%s)${C_RESET}\n" \
-                "$i" "${MODULE_NAME[$i]}" "$si" "$st"
+            printf "  ${C_CYAN}[%-2s]${C_RESET}  %-58s ${sc}%s (%s)${C_RESET}\n" "$i" "${MODULE_NAME[$i]}" "$si" "$st"
         done
-        echo ""; echo -e "  ${C_CYAN}[A] ${C_RESET}  Instalación completa recomendada"
+        echo ""; echo -e "  ${C_CYAN}[A] ${C_RESET}  Instalación completa (programas, sin gaming ni optimización)"
         echo -e "  ${C_CYAN}[Q] ${C_RESET}  Salir"; echo ""
         echo -ne "  ${C_BOLD}Selecciona opción: ${C_RESET}"; read -r choice
         case "${choice,,}" in
-            [0-9]|1[0-2]) _execute_module_flow "$choice" ;;
-            a)        _execute_full_install ;;
-            q)        echo ""; ui_info "Saliendo..."; break ;;
-            *)        ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
+            [0-9]|1[02]) _execute_module_flow "$choice" ;;
+            a) _execute_full_install ;;
+            q) echo ""; ui_info "Saliendo..."; break ;;
+            *) ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
         esac
     done
 }
@@ -237,19 +230,23 @@ main() {
 
     ui_banner; ui_info "Detectando hardware y estado del sistema..."
     detect_all; echo ""
-    echo -e "  ${C_DIM}GPU    : ${DETECT_GPU} (${DETECT_GPU_ARCH})${C_RESET}"
+    echo -e "  ${C_DIM}Distro : ${DETECT_DISTRO^} ${DETECT_OS_VER} (${DETECT_OS_CODENAME}) | Kernel: ${DETECT_KERNEL}${C_RESET}"
     echo -e "  ${C_DIM}CPU    : ${DETECT_CPU}${C_RESET}"
-    echo -e "  ${C_DIM}NVIDIA : ${DETECT_NVIDIA_DRIVER_VER} (${DETECT_NVIDIA_MODULE}) — Rama: ${DETECT_NVIDIA_BRANCH}${C_RESET}"
-    echo -e "  ${C_DIM}Ubuntu : ${DETECT_UBUNTU_VER} ${DETECT_UBUNTU_CODENAME} | Kernel: ${DETECT_KERNEL}${C_RESET}"
-    echo -e "  ${C_DIM}Docker : ${DETECT_DOCKER_RUNNING} | Node: ${DETECT_NODE_VER} | CUDA: ${DETECT_CUDA_VER}${C_RESET}"
-    echo -e "  ${C_DIM}NTSYNC : ${DETECT_NTSYNC} | Suspensión: ${DETECT_SUSPEND_CONFIGURED} | VRAM: ${DETECT_VRAM_PRESERVE}${C_RESET}"
-    echo ""; sleep 2
+    echo -e "  ${C_DIM}GPU    : ${DETECT_GPU} (${DETECT_GPU_ARCH}) | NVIDIA: ${DETECT_HAS_NVIDIA}${C_RESET}"
+    echo -e "  ${C_DIM}Docker : ${DETECT_DOCKER_RUNNING} | Node: ${DETECT_NODE_VER} | pnpm: ${DETECT_PNPM_VER}${C_RESET}"
+    echo ""
 
-    # Bug corregido: antes siempre se usaba el modo numérico aunque gum estuviera instalado
-    if $GUM_AVAILABLE && command -v gum &>/dev/null; then _tui_gum; else _tui_numeric; fi
+    if $AUTO_MODE; then
+        _execute_full_install
+    elif $GUM_AVAILABLE && command -v gum &>/dev/null; then
+        sleep 2; _tui_gum
+    else
+        sleep 2; _tui_numeric
+    fi
 
-    echo ""; ui_ok "Kubuntu Auto Setup Bootstrap finalizado."
+    echo ""; ui_ok "Auto Setup finalizado."
     echo -e "  ${C_DIM}Log: ${AG_LOG_FILE}${C_RESET}"; echo ""
+    $AUTO_MODE && ui_warn "Reinicia el equipo para aplicar todo: sudo reboot"
 }
 
 main "$@"

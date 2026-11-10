@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP — modules/02-nvidia.sh [Kubuntu 26.04 LTS]
-#  GTX 1660 SUPER (Turing/TU116)
+#  AUTO SETUP — modules/02-nvidia.sh [Debian 13 / Ubuntu 26.04]
+#  Solo se ejecuta si se detecta GPU NVIDIA. En equipos sin NVIDIA se omite.
 #
-#  DECISIONES:
+#  DEBIAN: usa el paquete "nvidia-driver" del repo non-free (gestionado por
+#          Debian, sin ramas ni PPAs) + suspensión + Wayland.
+#  UBUNTU (GTX 1660 SUPER, Turing/TU116) — DECISIONES:
 #  • Rama 580 — producción estable, NO 595 (regresiones Turing persisten en 595.84)
 #  • Variante configurable en packages.conf (2026-07-02: proprietary + GSP off)
 #    El driver open FUERZA firmware GSP → stutter conocido en Turing/KDE
@@ -28,18 +30,40 @@ readonly NVIDIA_MIN_VERSION=578
 readonly CUDA_VERSION="12-8"
 
 run_module_nvidia() {
-    ui_step "MÓDULO 02 — NVIDIA GTX 1660 SUPER (${NVIDIA_TARGET_PKG})"
-    ui_panel_start "Driver producción estable para Turing + Wayland + CUDA 12.8"
+    ui_step "MÓDULO 02 — DRIVER NVIDIA"
     export DEBIAN_FRONTEND=noninteractive
+    detect_hardware
+    if ! has_nvidia; then
+        ui_skip "Sin GPU NVIDIA (${DETECT_GPU}) — módulo omitido"
+        return 0
+    fi
 
     detect_nvidia
     _show_current_state
 
+    if is_debian; then
+        ui_panel_start "Debian: nvidia-driver (non-free) + Wayland + suspensión"
+        if [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && is_deb_installed nvidia-driver; then
+            ui_skip "nvidia-driver ya instalado y funcionando"
+        else
+            _check_run_installer
+            _install_nvidia_debian
+        fi
+        _configure_wayland_nvidia
+        _configure_suspend_services
+        _configure_vram_preservation
+        run_cmd 2 "update-initramfs" update-initramfs -u -k all
+        ui_panel_end; ui_ok "Módulo 02 completado"
+        ui_warn "REINICIO REQUERIDO"
+        return 0
+    fi
+
+    ui_panel_start "Ubuntu: ${NVIDIA_TARGET_PKG} (Turing) + Wayland + CUDA 12.8"
     if _is_correct_driver_loaded; then
         ui_ok "Driver ${NVIDIA_TARGET_PKG} ya instalado y funcionando"
         ui_skip "Instalación del driver"
         _configure_gsp
-        _configure_wayland_kubuntu2604
+        _configure_wayland_nvidia
         _configure_suspend_services
         _configure_vram_preservation
         _configure_ntsync
@@ -52,7 +76,7 @@ run_module_nvidia() {
     _install_nvidia_580
     _configure_gsp
     _install_cuda_128
-    _configure_wayland_kubuntu2604
+    _configure_wayland_nvidia
     _configure_suspend_services
     _configure_vram_preservation
     _configure_ntsync
@@ -124,6 +148,20 @@ alias nouveau off
 alias lbm-nouveau off
 EOF'
     ui_ok "nouveau en blacklist"
+}
+
+_install_nvidia_debian() {
+    ui_info "Instalando nvidia-driver desde el repo non-free de Debian..."
+    ui_warn "Puede tardar varios minutos — DKMS compilará el módulo. NO interrumpas."
+    if ! dpkg --print-foreign-architectures 2>/dev/null | grep -q i386; then
+        run_cmd 2 "Habilitar i386" dpkg --add-architecture i386
+        run_cmd 2 "apt update post-i386" apt update
+    else ui_skip "i386 ya habilitado"; fi
+    # nvidia-driver de Debian ya pone nouveau en blacklist por sí mismo
+    for pkg in nvidia-driver firmware-misc-nonfree nvidia-settings "nvidia-driver-libs:i386"; do
+        is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
+    done
+    ui_ok "nvidia-driver instalado"
 }
 
 _install_nvidia_580() {
@@ -214,15 +252,15 @@ export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"'
     ui_ok "CUDA 12.8 instalado"
 }
 
-_configure_wayland_kubuntu2604() {
-    ui_info "Configurando NVIDIA para Wayland en Kubuntu 26.04 (kernel 7.0, sin X11)..."
+_configure_wayland_nvidia() {
+    ui_info "Configurando NVIDIA para Wayland (KDE Plasma)..."
 
-    # nvidia-drm via modprobe.d — NO GRUB en kernel 7.0
+    # nvidia-drm via modprobe.d — NO GRUB
     local drmf="/etc/modprobe.d/nvidia-drm.conf"
     if [[ ! -f "$drmf" ]] || ! grep -q 'modeset=1' "$drmf" 2>/dev/null; then
         run_cmd 2 "Configurar nvidia-drm modeset" bash -c 'cat > /etc/modprobe.d/nvidia-drm.conf << EOF
-# KUBUNTU AUTO SETUP — NVIDIA DRM para Wayland Kubuntu 26.04
-# Kernel 7.0 — via modprobe.d, NO via GRUB
+# AUTO SETUP — NVIDIA DRM para Wayland
+# via modprobe.d, NO via GRUB
 options nvidia-drm modeset=1
 options nvidia-drm fbdev=1
 EOF'
@@ -231,7 +269,7 @@ EOF'
 
     # Limpiar modeset de GRUB si alguien lo puso ahí
     if grep -q 'nvidia-drm.modeset' /etc/default/grub 2>/dev/null; then
-        ui_warn "Limpiando nvidia-drm.modeset de GRUB (no necesario en kernel 7.0)..."
+        ui_warn "Limpiando nvidia-drm.modeset de GRUB (va en modprobe.d)..."
         run_cmd 1 "Limpiar GRUB" bash -c \
             "sed -i 's/ nvidia-drm\.modeset=1//g; s/nvidia-drm\.modeset=1 //g' /etc/default/grub"
         run_cmd 1 "Regenerar GRUB" update-grub
@@ -245,7 +283,7 @@ nvidia_uvm
 nvidia_drm
 EOF'
 
-    # Variables de entorno para KDE Plasma 6.6 + Wayland + NVIDIA 580
+    # Variables de entorno para KDE Plasma 6 + Wayland + NVIDIA
     local ef="/etc/environment"
     declare -A envs=(
         ["NVD_BACKEND"]="direct"
@@ -263,7 +301,7 @@ EOF'
         grep -q "^${key}=" "$ef" 2>/dev/null && ui_skip "Variable $key" \
             || run_cmd 1 "Agregar $key" bash -c "echo '${key}=${envs[$key]}' >> $ef"
     done
-    ui_ok "Entorno Wayland + NVIDIA 580 configurado"
+    ui_ok "Entorno Wayland + NVIDIA configurado"
 }
 
 _configure_suspend_services() {
@@ -272,7 +310,7 @@ _configure_suspend_services() {
         if systemctl list-unit-files 2>/dev/null | grep -q "$svc"; then
             is_service_enabled "$svc" && ui_skip "$svc habilitado" \
                 || run_cmd 1 "Habilitar $svc" systemctl enable "$svc"
-        else ui_warn "$svc no encontrado — se activará tras reiniciar con driver 580"; fi
+        else ui_warn "$svc no encontrado — se activará tras reiniciar"; fi
     done
 }
 
