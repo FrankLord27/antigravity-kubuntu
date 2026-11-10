@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP — lib/detect.sh  [Kubuntu 26.04 LTS]
-#  Detección hardware + estado sistema + 20 reglas de armonía
-#  Driver recomendado: 580 proprietary (GSP off) | CUDA: 12.8 | Wayland exclusivo
+#  AUTO SETUP — lib/detect.sh  [Debian 13 / Ubuntu 26.04]
+#  Detección de distro, hardware, estado del sistema y reglas de armonía
 # =============================================================================
-export DETECT_GPU="" DETECT_GPU_ARCH="" DETECT_CPU="" DETECT_RAM_GB=""
-export DETECT_DISK_FS="" DETECT_DISK_FREE_GB="" DETECT_KERNEL=""
-export DETECT_UBUNTU_VER="" DETECT_UBUNTU_CODENAME="" DETECT_SECURE_BOOT=""
+export DETECT_DISTRO="" DETECT_OS_VER="" DETECT_OS_CODENAME=""
+export DETECT_GPU="" DETECT_GPU_ARCH="" DETECT_HAS_NVIDIA="" DETECT_CPU="" DETECT_RAM_GB=""
+export DETECT_DISK_FS="" DETECT_DISK_FREE_GB="" DETECT_KERNEL="" DETECT_SECURE_BOOT=""
 export DETECT_SESSION_TYPE="" DETECT_NVIDIA_DRIVER_VER="" DETECT_NVIDIA_MODULE=""
 export DETECT_NVIDIA_DEB_PKG="" DETECT_NVIDIA_IS_OPEN="" DETECT_NVIDIA_BRANCH=""
 export DETECT_NVIDIA_WAYLAND_OK="" DETECT_SUSPEND_CONFIGURED="" DETECT_VRAM_PRESERVE=""
@@ -14,13 +13,28 @@ export DETECT_NTSYNC="" DETECT_CUDA_VER="" DETECT_DOCKER_RUNNING="" DETECT_DOCKE
 export DETECT_GSP_OFF=""
 export DETECT_NODE_VER="" DETECT_PNPM_VER="" DETECT_BTRFS=""
 
+detect_distro() {
+    source /etc/os-release 2>/dev/null
+    case "${ID:-}" in
+        debian) DETECT_DISTRO="debian" ;;
+        ubuntu) DETECT_DISTRO="ubuntu" ;;
+        *) [[ "${ID_LIKE:-}" == *ubuntu* ]] && DETECT_DISTRO="ubuntu" \
+            || { [[ "${ID_LIKE:-}" == *debian* ]] && DETECT_DISTRO="debian" || DETECT_DISTRO="otra"; } ;;
+    esac
+    DETECT_OS_VER="${VERSION_ID:-}"; DETECT_OS_CODENAME="${VERSION_CODENAME:-}"
+}
+
+is_debian() { [[ "$DETECT_DISTRO" == "debian" ]]; }
+is_ubuntu() { [[ "$DETECT_DISTRO" == "ubuntu" ]]; }
+has_nvidia() { [[ "$DETECT_HAS_NVIDIA" == "yes" ]]; }
+
 detect_hardware() {
+    detect_distro
     DETECT_GPU=$(lspci 2>/dev/null | grep -i 'vga\|3d\|display' | head -1 | sed 's/.*: //;s/ (.*//')
+    lspci 2>/dev/null | grep -i 'vga\|3d\|display' | grep -qi nvidia && DETECT_HAS_NVIDIA="yes" || DETECT_HAS_NVIDIA="no"
     DETECT_CPU=$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | sed 's/.*: //;s/  */ /g')
     DETECT_RAM_GB=$(free -g 2>/dev/null | awk '/^Mem:/{print $2}')
     DETECT_KERNEL=$(uname -r)
-    source /etc/os-release 2>/dev/null
-    DETECT_UBUNTU_VER="${VERSION_ID:-}"; DETECT_UBUNTU_CODENAME="${VERSION_CODENAME:-}"
     DETECT_DISK_FS=$(findmnt -n -o FSTYPE / 2>/dev/null)
     DETECT_DISK_FREE_GB=$(df -BG / 2>/dev/null | awk 'NR==2{gsub("G",""); print $4}')
     DETECT_SESSION_TYPE="${XDG_SESSION_TYPE:-unknown}"
@@ -28,13 +42,21 @@ detect_hardware() {
         || { echo "$DETECT_GPU" | grep -qi 'RTX 30' && DETECT_GPU_ARCH="Ampere" \
         || { echo "$DETECT_GPU" | grep -qi 'RTX 40' && DETECT_GPU_ARCH="Ada" \
         || { echo "$DETECT_GPU" | grep -qi 'RTX 50' && DETECT_GPU_ARCH="Blackwell" \
-        || DETECT_GPU_ARCH="Otra"; }; }; }
+        || { echo "$DETECT_GPU" | grep -qi 'intel' && DETECT_GPU_ARCH="Intel iGPU" \
+        || DETECT_GPU_ARCH="Otra"; }; }; }; }
     command -v mokutil &>/dev/null && \
         { mokutil --sb-state 2>/dev/null | grep -qi 'enabled' && DETECT_SECURE_BOOT="enabled" || DETECT_SECURE_BOOT="disabled"; } \
         || DETECT_SECURE_BOOT="unknown"
 }
 
 detect_nvidia() {
+    if ! has_nvidia; then
+        DETECT_NVIDIA_MODULE="n/a"; DETECT_NVIDIA_DRIVER_VER="sin GPU NVIDIA"
+        DETECT_NVIDIA_DEB_PKG="ninguno"; DETECT_NVIDIA_IS_OPEN="n/a"; DETECT_NVIDIA_BRANCH="n/a"
+        DETECT_NVIDIA_WAYLAND_OK="n/a"; DETECT_SUSPEND_CONFIGURED="n/a"; DETECT_VRAM_PRESERVE="n/a"
+        DETECT_GSP_OFF="n/a"; DETECT_NTSYNC="n/a"; DETECT_CUDA_VER="n/a"
+        return 0
+    fi
     if lsmod 2>/dev/null | grep -q '^nvidia '; then
         DETECT_NVIDIA_MODULE="loaded"
         DETECT_NVIDIA_DRIVER_VER=$(modinfo -F version nvidia 2>/dev/null || echo "?")
@@ -43,17 +65,16 @@ detect_nvidia() {
     else
         DETECT_NVIDIA_MODULE="missing"; DETECT_NVIDIA_DRIVER_VER="no instalado"
     fi
-    DETECT_NVIDIA_DEB_PKG=$(dpkg -l 2>/dev/null | grep -E '^ii.*nvidia-driver-[0-9]+' | awk '{print $2}' | sort -V | tail -1 || echo "ninguno")
+    DETECT_NVIDIA_DEB_PKG=$(dpkg -l 2>/dev/null | grep -E '^ii.*nvidia-driver(-[0-9]+)?' | awk '{print $2}' | sort -V | tail -1 || echo "ninguno")
+    [[ -z "$DETECT_NVIDIA_DEB_PKG" ]] && DETECT_NVIDIA_DEB_PKG="ninguno"
     dpkg -l 2>/dev/null | grep -qE '^ii.*nvidia-driver-[0-9]+-open' && DETECT_NVIDIA_IS_OPEN="yes" \
         || { [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && DETECT_NVIDIA_IS_OPEN="no" || DETECT_NVIDIA_IS_OPEN="unknown"; }
     if [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]]; then
         local vm; vm=$(echo "$DETECT_NVIDIA_DRIVER_VER" | cut -d. -f1)
         [[ -n "$vm" ]] && [[ "$vm" -ge 580 ]] && [[ "$vm" -lt 590 ]] && DETECT_NVIDIA_BRANCH="580 (producción ✓)" \
             || { [[ -n "$vm" ]] && [[ "$vm" -ge 590 ]] && DETECT_NVIDIA_BRANCH="${vm} (595 — regresiones Turing)" \
-            || DETECT_NVIDIA_BRANCH="${vm} (antiguo)"; }
-        [[ -n "$vm" ]] && [[ "$vm" -ge 580 ]] && [[ "$vm" -lt 590 ]] && DETECT_NVIDIA_WAYLAND_OK="sí (driver 580)" \
-            || { [[ -n "$vm" ]] && [[ "$vm" -ge 590 ]] && DETECT_NVIDIA_WAYLAND_OK="parcial (595 parpadeos)" \
-            || DETECT_NVIDIA_WAYLAND_OK="no (driver antiguo)"; }
+            || DETECT_NVIDIA_BRANCH="${vm}"; }
+        [[ -n "$vm" ]] && [[ "$vm" -ge 580 ]] && DETECT_NVIDIA_WAYLAND_OK="sí" || DETECT_NVIDIA_WAYLAND_OK="parcial (driver antiguo)"
     else DETECT_NVIDIA_WAYLAND_OK="desconocida"; fi
     local sok=true
     for s in nvidia-suspend.service nvidia-resume.service; do
@@ -76,9 +97,15 @@ detect_docker() {
     DETECT_DOCKER_GPU="no verificado"
 }
 
+# node/pnpm viven en el home del usuario real (nvm) — se consultan como ese usuario
 detect_dev_tools() {
-    command -v node &>/dev/null && DETECT_NODE_VER=$(node -v 2>/dev/null) || DETECT_NODE_VER="no instalado"
-    command -v pnpm &>/dev/null && DETECT_PNPM_VER=$(pnpm -v 2>/dev/null) || DETECT_PNPM_VER="no instalado"
+    local ru="${SUDO_USER:-$USER}"
+    local rh; rh=$(eval echo "~${ru}")
+    local probe='[[ -s "$HOME/.nvm/nvm.sh" ]] && source "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; '
+    DETECT_NODE_VER=$(sudo -u "$ru" HOME="$rh" bash -c "${probe}node -v 2>/dev/null" 2>/dev/null)
+    [[ -z "$DETECT_NODE_VER" ]] && DETECT_NODE_VER="no instalado"
+    DETECT_PNPM_VER=$(sudo -u "$ru" HOME="$rh" bash -c "${probe}pnpm -v 2>/dev/null" 2>/dev/null)
+    [[ -z "$DETECT_PNPM_VER" ]] && DETECT_PNPM_VER="no instalado"
 }
 
 detect_btrfs() { [[ "$DETECT_DISK_FS" == "btrfs" ]] && DETECT_BTRFS="yes" || DETECT_BTRFS="no"; }
@@ -94,76 +121,61 @@ declare -a HARMONY_ISSUES=() HARMONY_WARNINGS=()
 
 detect_harmony() {
     HARMONY_ISSUES=(); HARMONY_WARNINGS=()
-    [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && [[ "$DETECT_NVIDIA_MODULE" == "missing" ]] && \
-        HARMONY_ISSUES+=("NVIDIA: paquete instalado pero módulo NO cargado — DKMS roto")
-    [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
-        HARMONY_ISSUES+=("NVIDIA: nouveau activo con driver propietario instalado — conflicto")
-    [[ "$DETECT_SECURE_BOOT" == "enabled" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
-        HARMONY_ISSUES+=("Secure Boot ACTIVO — puede impedir carga del módulo NVIDIA")
-    local kv; kv=$(uname -r)
-    is_deb_installed "linux-headers-${kv}" || \
-        HARMONY_WARNINGS+=("Kernel headers no coinciden con kernel activo ($kv) — DKMS fallará")
-    if [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]]; then
-        local vm; vm=$(echo "$DETECT_NVIDIA_DRIVER_VER" | cut -d. -f1)
-        [[ -n "$vm" ]] && [[ "$vm" -ge 590 ]] && \
-            HARMONY_ISSUES+=("Driver ${vm} (serie 595+) en Turing: parpadeos, cursor invisible Steam, fallos suspensión — usa 580-open")
-        [[ -n "$vm" ]] && [[ "$vm" -lt 578 ]] && [[ "$vm" -gt 0 ]] && \
-            HARMONY_WARNINGS+=("Driver $DETECT_NVIDIA_DRIVER_VER antiguo — actualiza a 580-open")
+    local ru="${SUDO_USER:-$USER}"
+
+    if has_nvidia; then
+        [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && [[ "$DETECT_NVIDIA_MODULE" == "missing" ]] && \
+            HARMONY_ISSUES+=("NVIDIA: paquete instalado pero módulo NO cargado — DKMS roto")
+        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
+            HARMONY_ISSUES+=("NVIDIA: nouveau activo con driver propietario instalado — conflicto")
+        [[ "$DETECT_SECURE_BOOT" == "enabled" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
+            HARMONY_ISSUES+=("Secure Boot ACTIVO — puede impedir carga del módulo NVIDIA")
+        local kv; kv=$(uname -r)
+        is_deb_installed "linux-headers-${kv}" || \
+            HARMONY_WARNINGS+=("Kernel headers no coinciden con kernel activo ($kv) — DKMS fallará")
+        if is_ubuntu && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]]; then
+            local vm; vm=$(echo "$DETECT_NVIDIA_DRIVER_VER" | cut -d. -f1)
+            [[ -n "$vm" ]] && [[ "$vm" -ge 590 ]] && \
+                HARMONY_ISSUES+=("Driver ${vm} (serie 595+) en Turing: parpadeos y fallos de suspensión — usa 580")
+            [[ "$DETECT_NVIDIA_IS_OPEN" == "yes" ]] && [[ "$DETECT_GSP_OFF" == "yes" ]] && \
+                HARMONY_ISSUES+=("nvidia-gsp.conf presente con driver open — el módulo puede NO cargar")
+        fi
+        [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && ! grep -q 'modeset=1' /etc/modprobe.d/nvidia-drm.conf 2>/dev/null && \
+            HARMONY_ISSUES+=("nvidia-drm.modeset=1 no configurado via modprobe — Wayland no funcionará")
+        [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]] && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
+            HARMONY_ISSUES+=("Servicios suspensión NVIDIA desactivados — pantalla negra al despertar")
+        [[ "$DETECT_VRAM_PRESERVE" == "no" ]] && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
+            HARMONY_WARNINGS+=("NVreg_PreserveVideoMemoryAllocations no configurado — suspensión inestable")
+        local nc; nc=$(dpkg -l 2>/dev/null | grep -cE '^ii.*nvidia-driver-[0-9]+' || true)
+        nc=$(echo "${nc:-0}" | tr -d '[:space:]')
+        [[ "$nc" -gt 1 ]] 2>/dev/null && HARMONY_ISSUES+=("Múltiples drivers NVIDIA instalados ($nc versiones) — conflicto activo")
+        [[ -f /usr/bin/nvidia-uninstall ]] && \
+            HARMONY_ISSUES+=("Driver NVIDIA instalado manualmente (.run) — incompatible con apt")
+        is_service_active docker && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
+            ! is_deb_installed nvidia-container-toolkit && \
+            HARMONY_ISSUES+=("Docker + NVIDIA sin nvidia-container-toolkit — GPU no disponible en contenedores")
     fi
-    # Cerrado + GSP off es elección deliberada (fix stutter Turing) — no advertir
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]] && [[ "$DETECT_GSP_OFF" != "yes" ]] && \
-        HARMONY_WARNINGS+=("Driver variante cerrada sin GSP off — decide variante en packages.conf")
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "yes" ]] && [[ "$DETECT_GSP_OFF" == "yes" ]] && \
-        HARMONY_ISSUES+=("nvidia-gsp.conf presente con driver open — el módulo puede NO cargar (GSP es obligatorio en open)")
-    [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && ! grep -q 'modeset=1' /etc/modprobe.d/nvidia-drm.conf 2>/dev/null && \
-        HARMONY_ISSUES+=("nvidia-drm.modeset=1 no configurado via modprobe — Wayland no funcionará")
-    grep -q 'nvidia-drm.modeset' /etc/default/grub 2>/dev/null && \
-        HARMONY_WARNINGS+=("nvidia-drm.modeset en GRUB — en kernel 7.0 debe estar en modprobe.d")
-    [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]] && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
-        HARMONY_ISSUES+=("Servicios suspensión NVIDIA desactivados — pantalla negra al despertar garantizada")
-    [[ "$DETECT_VRAM_PRESERVE" == "no" ]] && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
-        HARMONY_WARNINGS+=("NVreg_PreserveVideoMemoryAllocations no configurado — suspensión inestable en Turing")
-    is_deb_installed plasma-session-x11 2>/dev/null && \
-        HARMONY_WARNINGS+=("plasma-session-x11 instalado — Kubuntu 26.04 no soporta X11 oficialmente")
-    local nc; nc=$(dpkg -l 2>/dev/null | grep -cE '^ii.*nvidia-driver-[0-9]+' || true)
-    nc=${nc:-0}; nc=$(echo "$nc" | tr -d '[:space:]')
-    [[ "$nc" -gt 1 ]] 2>/dev/null && HARMONY_ISSUES+=("Múltiples drivers NVIDIA instalados ($nc versiones) — conflicto activo")
-    [[ -f /usr/bin/nvidia-uninstall ]] && \
-        HARMONY_ISSUES+=("Driver NVIDIA instalado manualmente (.run) — incompatible con apt")
-    is_service_active docker && [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && \
-        ! is_deb_installed nvidia-container-toolkit && \
-        HARMONY_ISSUES+=("Docker + NVIDIA sin nvidia-container-toolkit — GPU no disponible en contenedores")
+
     is_service_active docker && \
-        { local ru="${SUDO_USER:-$USER}"; groups "$ru" 2>/dev/null | grep -q docker || \
-        HARMONY_WARNINGS+=("Docker activo pero '$ru' no está en grupo docker"); }
-    [[ "$DETECT_NTSYNC" == "missing" ]] && \
-        HARMONY_WARNINGS+=("NTSYNC no disponible — gaming con Proton sin optimización")
+        { groups "$ru" 2>/dev/null | grep -q docker || HARMONY_WARNINGS+=("Docker activo pero '$ru' no está en grupo docker"); }
     local bf; bf=$(df -BM /boot 2>/dev/null | awk 'NR==2{gsub("M",""); print $4}')
     [[ -n "$bf" ]] && [[ "$bf" -lt 200 ]] && \
         HARMONY_ISSUES+=("/boot casi lleno (${bf}MB) — DKMS/kernel fallarán")
-    snap list docker &>/dev/null 2>&1 && \
-        HARMONY_ISSUES+=("Docker instalado como snap — conflicto con Docker CE, GPU no disponible")
-    [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && is_service_active docker && \
-        [[ "$DETECT_CUDA_VER" == "no instalado" ]] && ! [[ -d /usr/local/cuda ]] && \
-        ! is_deb_installed cuda-toolkit-12-8 && \
-        HARMONY_WARNINGS+=("NVIDIA + Docker sin CUDA — Ollama/Open WebUI no usarán GPU")
+    command -v snap &>/dev/null && snap list docker &>/dev/null 2>&1 && \
+        HARMONY_ISSUES+=("Docker instalado como snap — conflicto con Docker CE")
 }
 
 calculate_health_score() {
     local score=100 d=0
-    # Solo issues activos penalizan (warnings reducen menos)
     d=$(( ${#HARMONY_ISSUES[@]} * 12 + ${#HARMONY_WARNINGS[@]} * 3 ))
-    # Crítico: driver NVIDIA no cargado
-    [[ "$DETECT_NVIDIA_MODULE" == "missing" ]]  && d=$(( d + 20 ))
-    [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]]  && d=$(( d + 10 ))
-    # Importante: variante y suspensión (cerrado + GSP off es deliberado, no penaliza)
-    [[ "$DETECT_NVIDIA_IS_OPEN" == "no" ]] && [[ "$DETECT_GSP_OFF" != "yes" ]] && d=$(( d + 4 ))
-    [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 6 ))
-    [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 3 ))
-    # Docker es importante pero no crítico
+    if has_nvidia; then
+        [[ "$DETECT_NVIDIA_MODULE" == "missing" ]]  && d=$(( d + 20 ))
+        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]]  && d=$(( d + 10 ))
+        [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 6 ))
+        [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 3 ))
+        [[ "$DETECT_SECURE_BOOT" == "enabled" ]]    && d=$(( d + 8 ))
+    fi
     [[ "$DETECT_DOCKER_RUNNING" == "no" ]]      && d=$(( d + 3 ))
-    [[ "$DETECT_SECURE_BOOT" == "enabled" ]]    && d=$(( d + 8 ))
-    # NTSYNC y CUDA son opcionales — no penalizan
     score=$(( score - d ))
     [[ $score -lt 0 ]] && score=0; [[ $score -gt 100 ]] && score=100
     echo "$score"

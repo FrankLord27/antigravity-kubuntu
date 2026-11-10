@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KUBUNTU AUTO SETUP — modules/10-git.sh [Kubuntu 26.04 LTS]
+# AUTO SETUP — modules/10-git.sh [Debian 13 / Ubuntu 26.04]
 # Git completo: identidad interactiva, aliases, SSH key, configuración global
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -161,14 +161,14 @@ _setup_github_cli_and_signing() {
 
         ui_info "Configurando Signing Key en GitHub..."
         if sudo -u "$real_user" gh auth status &>/dev/null; then
-            run_cmd 1 "Subir Signing Key a GitHub" sudo -u "$real_user" gh ssh-key add "$ssh_pub" --type signing --title "Signing key Kubuntu" || {
+            run_cmd 1 "Subir Signing Key a GitHub" sudo -u "$real_user" gh ssh-key add "$ssh_pub" --type signing --title "Signing key $(hostname)" || {
                 ui_warn "Puede que necesites permisos adicionales. Ejecuta:"
                 ui_warn "  gh auth refresh -h github.com -s admin:ssh_signing_key"
             }
         else
             ui_warn "No estás logueado en gh. Para subir la llave automáticamente usa:"
             ui_warn "  gh auth login"
-            ui_warn "  gh ssh-key add $ssh_pub --type signing --title \"Signing key Kubuntu\""
+            ui_warn "  gh ssh-key add $ssh_pub --type signing --title \"Signing key $(hostname)\""
         fi
     fi
 }

@@ -1,9 +1,0 @@
-[Desktop Entry]
-DefaultProfile=Antigravity.profile
-
-[MainWindow]
-State[$d]
-
-[Notification Messages]
-CloseAllTabs=true
-ShowPasteHugeTextWarning=false

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP — modules/12-apps.sh [Kubuntu 26.04 LTS]
-#  Apps personales auditadas del sistema real (2026-07-02)
+#  AUTO SETUP — modules/12-apps.sh [Debian 13 / Ubuntu 26.04]
+#  Apps personales: apt + AnyDesk + TeamViewer + flatpak (sin snap)
 #  Lee las listas de configs/packages.conf — comenta ahí lo que no quieras.
 # =============================================================================
 
@@ -10,10 +10,18 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 source "${SCRIPT_DIR}/configs/packages.conf"
 
+# Paquetes apt que no existen en el repo se registran para caer a flatpak
+declare -a APT_MISSING=()
+
 _install_apt_apps() {
     ui_info "Instalando apps apt (${#PKGS_APPS_EXTRA[@]} paquetes)..."
     for pkg in "${PKGS_APPS_EXTRA[@]}"; do
-        is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
+        if is_deb_installed "$pkg"; then ui_skip "$pkg"; continue; fi
+        if ! apt-cache show "$pkg" &>/dev/null; then
+            ui_warn "$pkg no está en los repos apt — se intentará por flatpak"
+            APT_MISSING+=("$pkg"); continue
+        fi
+        run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
     done
 }
 
@@ -40,16 +48,6 @@ _install_teamviewer() {
     rm -rf "$tmp"
 }
 
-_install_snap_apps() {
-    command -v snap &>/dev/null || { ui_warn "snap no disponible — omitiendo apps snap"; return 0; }
-    for app in "${SNAP_APPS[@]}"; do
-        snap list "$app" &>/dev/null && ui_skip "snap: $app" || run_cmd 2 "snap install $app" snap install "$app"
-    done
-    for app in "${SNAP_APPS_CLASSIC[@]}"; do
-        snap list "$app" &>/dev/null && ui_skip "snap: $app" || run_cmd 2 "snap install $app (classic)" snap install "$app" --classic
-    done
-}
-
 _install_flatpak_apps() {
     if ! command -v flatpak &>/dev/null; then
         run_cmd 2 "Instalar flatpak" apt install -y flatpak
@@ -57,20 +55,21 @@ _install_flatpak_apps() {
     flatpak remotes 2>/dev/null | grep -q flathub \
         || run_cmd 2 "Agregar Flathub" flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     for app in "${FLATPAK_APPS[@]}"; do
+        # Discord por flatpak solo si no vino por apt
+        [[ "$app" == "com.discordapp.Discord" ]] && is_deb_installed discord && { ui_skip "Discord (ya por apt)"; continue; }
         flatpak info "$app" &>/dev/null && ui_skip "flatpak: $app" \
-            || run_cmd 2 "flatpak install $app" flatpak install -y flathub "$app"
+            || run_cmd 2 "flatpak install $app" flatpak install -y --noninteractive flathub "$app"
     done
 }
 
 run_module_apps() {
     ui_step "MÓDULO 12 — APPS PERSONALES"
-    ui_panel_start "apt + AnyDesk + TeamViewer + snap + flatpak"
+    ui_panel_start "apt + AnyDesk + TeamViewer + flatpak"
     export DEBIAN_FRONTEND=noninteractive
 
     _install_apt_apps
     _install_anydesk
     _install_teamviewer
-    _install_snap_apps
     _install_flatpak_apps
 
     ui_panel_end; ui_ok "Módulo 12 completado"

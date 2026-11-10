@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KUBUNTU AUTO SETUP — modules/07-verify.sh [Kubuntu 26.04 LTS]
+# AUTO SETUP — modules/07-verify.sh [Debian 13 / Ubuntu 26.04]
 # Verificación completa post-instalación + Health Score final
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,12 +9,13 @@ source "${SCRIPT_DIR}/lib/detect.sh"
 run_module_verify() {
     ui_step "MÓDULO 07 — VERIFICACIÓN FINAL DEL SISTEMA"
     detect_all; detect_harmony
-    _verify_nvidia; _verify_docker; _verify_dev; _verify_gaming
+    has_nvidia && _verify_nvidia
+    _verify_docker; _verify_dev; _verify_gaming
     _verify_system; _verify_harmony_final; _show_final_score; _show_next_steps
 }
 
 _verify_nvidia() {
-    ui_step "Verificando NVIDIA — Driver 580-open / Wayland / Kubuntu 26.04"
+    ui_step "Verificando NVIDIA — Driver / Wayland"
 
     silent_cmd nvidia-smi && {
         local info; info=$(nvidia-smi --query-gpu=name,driver_version,temperature.gpu,utilization.gpu --format=csv,noheader 2>/dev/null)
@@ -23,17 +24,16 @@ _verify_nvidia() {
     } || { ui_fail "nvidia-smi FALLA — driver no cargado"; ui_warn "journalctl -b | grep -i nvidia"; }
 
     local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "")
-    if [[ -n "$drv_ver" ]]; then
+    if is_ubuntu && [[ -n "$drv_ver" ]]; then
         local drv_major; drv_major=$(echo "$drv_ver" | cut -d. -f1)
         [[ "$drv_major" -ge 580 ]] && [[ "$drv_major" -lt 590 ]] \
             && ui_ok "Driver serie 580 confirmado ($drv_ver) — producción estable" \
             || { [[ "$drv_major" -ge 590 ]] \
                 && ui_warn "Driver 595+ detectado ($drv_ver) — regresiones en Turing, considera degradar a 580" \
-                || ui_warn "Driver $drv_ver — versión antigua, actualiza a 580-open"; }
+                || ui_warn "Driver $drv_ver — versión antigua, actualiza a 580"; }
+    elif [[ -n "$drv_ver" ]]; then
+        ui_ok "Driver NVIDIA $drv_ver (paquete nvidia-driver de Debian)"
     fi
-
-    is_deb_installed "nvidia-driver-580-open" && ui_ok "Variante -open instalada (módulos kernel abiertos GSP)" \
-        || ui_warn "Variante -open NO detectada — dpkg -l | grep nvidia-driver"
 
     local mods; mods=$(lsmod 2>/dev/null | grep '^nvidia' | awk '{print $1}' | tr '\n' ' ')
     [[ -n "$mods" ]] && ui_ok "Módulos NVIDIA: $mods" || ui_fail "Ningún módulo NVIDIA cargado — reinicia"
@@ -48,11 +48,11 @@ _verify_nvidia() {
     local session_type; session_type=$(loginctl show-session "$(loginctl list-sessions --no-legend 2>/dev/null | awk 'NR==1{print $1}')" -p Type --value 2>/dev/null || echo "")
     [[ -z "$session_type" ]] && session_type="${XDG_SESSION_TYPE:-}"
     [[ "$session_type" == "wayland" ]] \
-        && ui_ok "Sesión Wayland activa — correcto para Kubuntu 26.04" \
-        || ui_warn "Sesión: ${session_type:-desconocida} — Kubuntu 26.04 solo soporta Wayland"
+        && ui_ok "Sesión Wayland activa" \
+        || ui_warn "Sesión: ${session_type:-desconocida} — se recomienda Wayland"
 
     grep -q 'modeset=1' /etc/modprobe.d/nvidia-drm.conf 2>/dev/null \
-        && ui_ok "nvidia-drm.modeset=1 via modprobe (correcto para kernel 7.0)" \
+        && ui_ok "nvidia-drm.modeset=1 via modprobe" \
         || ui_warn "nvidia-drm.modeset no encontrado en modprobe.d"
 
     grep -q 'fbdev=1' /etc/modprobe.d/nvidia-drm.conf 2>/dev/null \
@@ -96,8 +96,8 @@ _verify_docker() {
     local ru="${SUDO_USER:-$USER}"
     groups "$ru" 2>/dev/null | grep -q docker && ui_ok "Usuario '$ru' en grupo docker" \
         || ui_warn "'$ru' NO en grupo docker — cierra sesión y vuelve"
-    is_deb_installed nvidia-container-toolkit && ui_ok "NVIDIA Container Toolkit instalado" \
-        || ui_fail "NVIDIA Container Toolkit NO instalado — GPU no disponible en Docker"
+    has_nvidia && { is_deb_installed nvidia-container-toolkit && ui_ok "NVIDIA Container Toolkit instalado" \
+        || ui_fail "NVIDIA Container Toolkit NO instalado — GPU no disponible en Docker"; }
 }
 
 _verify_dev() {
@@ -105,24 +105,18 @@ _verify_dev() {
     local real_user="${SUDO_USER:-$USER}"
     local real_home; real_home=$(eval echo "~${real_user}")
 
-    # Verificar node/pnpm desde el entorno del usuario real (fnm está en su home)
-    local node_ver; node_ver=$(sudo -u "$real_user" bash -c '
-        export HOME="'"$real_home"'"
-        [[ -d "$HOME/.local/share/fnm" ]] && eval "$('"$real_home"'/.local/share/fnm/fnm env 2>/dev/null)" 2>/dev/null
-        [[ -f "$HOME/.nvm/nvm.sh" ]] && source "$HOME/.nvm/nvm.sh" 2>/dev/null
-        node --version 2>/dev/null || echo "no"
-    ' 2>/dev/null)
-    [[ "$node_ver" != "no" && -n "$node_ver" ]] && ui_ok "Node.js: $node_ver" \
-        || ui_fail "Node.js no encontrado — source ~/.bashrc"
-
-    local pnpm_ver; pnpm_ver=$(sudo -u "$real_user" bash -c '
-        export HOME="'"$real_home"'"
-        [[ -d "$HOME/.local/share/fnm" ]] && eval "$('"$real_home"'/.local/share/fnm/fnm env 2>/dev/null)" 2>/dev/null
-        [[ -f "$HOME/.nvm/nvm.sh" ]] && source "$HOME/.nvm/nvm.sh" 2>/dev/null
-        pnpm --version 2>/dev/null || echo "no"
-    ' 2>/dev/null)
-    [[ "$pnpm_ver" != "no" && -n "$pnpm_ver" ]] && ui_ok "pnpm: $pnpm_ver" \
-        || ui_fail "pnpm no encontrado"
+    # node/pnpm/agentes viven en el nvm del usuario real
+    local probe='[[ -s "$HOME/.nvm/nvm.sh" ]] && source "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; '
+    local node_ver; node_ver=$(sudo -u "$real_user" HOME="$real_home" bash -c "${probe}node -v 2>/dev/null")
+    [[ -n "$node_ver" ]] && ui_ok "Node.js: $node_ver" || ui_fail "Node.js no encontrado — instala módulo 4"
+    local pnpm_ver; pnpm_ver=$(sudo -u "$real_user" HOME="$real_home" bash -c "${probe}pnpm -v 2>/dev/null")
+    [[ -n "$pnpm_ver" ]] && ui_ok "pnpm: $pnpm_ver" || ui_fail "pnpm no encontrado — instala módulo 4"
+    for cli in claude codex gemini; do
+        sudo -u "$real_user" HOME="$real_home" bash -c "${probe}command -v $cli" &>/dev/null \
+            && ui_ok "Agente IA: $cli" || ui_warn "Agente IA '$cli' no encontrado — instala módulo 4"
+    done
+    is_deb_installed orca-ide && ui_ok "Orca (gestor de agentes) instalado" \
+        || ui_warn "Orca no instalado — instala módulo 4"
 
     is_cmd_available code && ui_ok "VS Code: $(code --version 2>/dev/null | head -1)" \
         || ui_warn "VS Code no en PATH — instala módulo 4"
@@ -172,9 +166,9 @@ _verify_system() {
     local bf; bf=$(df -BM /boot 2>/dev/null | awk 'NR==2{gsub("M",""); print $4}')
     [[ -n "$bf" ]] && { [[ "$bf" -lt 200 ]] && ui_warn "/boot casi lleno (${bf}MB)" || ui_ok "/boot: ${bf}MB libre"; }
 
-    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_warn "Timeshift no instalado"
-    [[ -b /dev/zram0 ]] && ui_ok "ZRAM activo" || ui_warn "ZRAM no activo"
-    is_service_enabled fstrim.timer && ui_ok "TRIM SSD habilitado" || ui_warn "TRIM SSD no habilitado"
+    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_info "Timeshift no instalado (opcional, módulo 6)"
+    [[ -b /dev/zram0 ]] && ui_ok "ZRAM activo" || ui_info "ZRAM no activo (opcional, módulo 6)"
+    is_service_enabled fstrim.timer && ui_ok "TRIM SSD habilitado" || ui_info "TRIM SSD no habilitado (opcional, módulo 6)"
 
     silent_cmd nvidia-smi && {
         local t; t=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null)
@@ -205,7 +199,7 @@ _show_final_score() {
     local bar; bar="${color}$(printf '█%.0s' $(seq 1 "$filled") 2>/dev/null)${C_GRAY}$(printf '░%.0s' $(seq 1 "$empty") 2>/dev/null)${C_RESET}"
     echo ""
     echo -e "${C_BOLD}  ╔══════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_BOLD}  ║         HEALTH SCORE FINAL — KUBUNTU AUTO SETUP            ║${C_RESET}"
+    echo -e "${C_BOLD}  ║              HEALTH SCORE FINAL — AUTO SETUP              ║${C_RESET}"
     echo -e "${C_BOLD}  ╠══════════════════════════════════════════════════════╣${C_RESET}"
     echo -e "  ║  ${bar}"
     printf  "  ║  ${color}${C_BOLD}%-52s${C_RESET}║\n" "${score}%  —  ${label}"
@@ -219,15 +213,11 @@ _show_final_score() {
 _show_next_steps() {
     echo ""
     echo -e "${C_BOLD}  ┌─ PRÓXIMOS PASOS ──────────────────────────────────────┐${C_RESET}"
-    echo -e "  │  ${C_WHITE}1.${C_RESET} Reinicia si instalaste NVIDIA: ${C_DIM}sudo reboot${C_RESET}        │"
-    echo -e "  │  ${C_WHITE}2.${C_RESET} Configura Git (identidad + SSH):                  │"
-    echo -e "  │     ${C_DIM}Ejecuta módulo [10] desde el menú principal${C_RESET}        │"
-    echo -e "  │  ${C_WHITE}3.${C_RESET} Verifica NVIDIA: ${C_DIM}nvidia-smi && dkms status${C_RESET}       │"
-    echo -e "  │  ${C_WHITE}4.${C_RESET} Verifica GPU Docker:                              │"
-    echo -e "  │     ${C_DIM}docker run --rm --gpus all ubuntu nvidia-smi${C_RESET}       │"
-    echo -e "  │  ${C_WHITE}5.${C_RESET} Configura Timeshift para snapshots               │"
-    echo -e "  │  ${C_WHITE}6.${C_RESET} Instala Proton-GE con ProtonUp-Qt               │"
-    echo -e "  │  ${C_WHITE}7.${C_RESET} Re-ejecuta diagnóstico: ${C_DIM}sudo bash modules/00-diagnostics.sh${C_RESET} │"
+    echo -e "  │  ${C_WHITE}1.${C_RESET} Reinicia: ${C_DIM}sudo reboot${C_RESET}                                 │"
+    echo -e "  │  ${C_WHITE}2.${C_RESET} Login de agentes: ${C_DIM}claude · codex login · gemini${C_RESET}    │"
+    echo -e "  │  ${C_WHITE}3.${C_RESET} Abre Orca y añade tus proyectos                   │"
+    echo -e "  │  ${C_WHITE}4.${C_RESET} GitHub: ${C_DIM}gh auth login${C_RESET} y sube la clave SSH        │"
+    echo -e "  │  ${C_WHITE}5.${C_RESET} Diagnóstico: ${C_DIM}sudo bash modules/00-diagnostics.sh${C_RESET}  │"
     printf  "  │  Log: ${C_DIM}%-51s${C_RESET}│\n" "$AG_LOG_FILE"
     echo -e "  └───────────────────────────────────────────────────────┘"; echo ""
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# KUBUNTU AUTO SETUP — modules/05-gaming.sh [Kubuntu 26.04 LTS]
-# Gaming: Steam + Lutris + Wine + Vulkan + MangoHud + GameMode + NTSYNC
+# AUTO SETUP — modules/05-gaming.sh [Debian 13 / Ubuntu 26.04]
+# Gaming (OPCIONAL): Steam + Lutris + Wine + Vulkan + MangoHud + GameMode
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
@@ -10,6 +10,7 @@ run_module_gaming() {
     ui_step "MÓDULO 05 — GAMING"
     ui_panel_start "Steam + Lutris + Vulkan + MangoHud + GameMode"
     export DEBIAN_FRONTEND=noninteractive
+    detect_hardware
 
     ui_info "Verificando arquitectura i386..."
     dpkg --print-foreign-architectures 2>/dev/null | grep -q i386 && ui_skip "i386 ya habilitado" || {
@@ -39,10 +40,9 @@ run_module_gaming() {
             run_cmd 1 "GPG key WineHQ" bash -c \
                 'curl -fsSL https://dl.winehq.org/wine-builds/winehq.key \
                 | gpg --dearmor -o /usr/share/keyrings/winehq.gpg'
-            local codename; codename=$(source /etc/os-release && echo "$VERSION_CODENAME")
-            run_cmd 1 "Repo WineHQ" bash -c \
+            run_cmd 1 "Repo WineHQ (${DETECT_DISTRO})" bash -c \
                 "echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/winehq.gpg] \
-                https://dl.winehq.org/wine-builds/ubuntu/ ${codename} main' \
+                https://dl.winehq.org/wine-builds/${DETECT_DISTRO}/ ${DETECT_OS_CODENAME} main' \
                 > /etc/apt/sources.list.d/winehq.list"
             run_cmd 1 "apt update post-WineHQ" apt update
         fi
@@ -60,7 +60,7 @@ run_module_gaming() {
     local mango_dir; mango_dir="$(eval echo "~$real_user")/.config/MangoHud"
     mkdir -p "$mango_dir"
     [[ ! -f "${mango_dir}/MangoHud.conf" ]] && cat > "${mango_dir}/MangoHud.conf" << 'EOF'
-# MangoHud — KUBUNTU AUTO SETUP (GTX 1660 SUPER + i5-10400F)
+# MangoHud — AUTO SETUP
 fps
 gpu_stats
 gpu_temp
@@ -87,18 +87,20 @@ EOF
         || run_cmd 1 "Instalar ProtonUp-Qt" flatpak install -y flathub net.davidotek.pupgui2
 
     ui_info "Instalando codecs multimedia..."
-    for pkg in ffmpeg gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-                gstreamer1.0-plugins-good gstreamer1.0-libav gstreamer1.0-vaapi \
-                ubuntu-restricted-extras mpv vlc; do
+    local codecs=(ffmpeg gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+                  gstreamer1.0-plugins-good gstreamer1.0-libav gstreamer1.0-vaapi mpv vlc)
+    is_ubuntu && codecs+=(ubuntu-restricted-extras)
+    for pkg in "${codecs[@]}"; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 1 "Instalar $pkg" apt install -y "$pkg"
     done
 
-    for pkg in nvtop btop htop; do
+    local monitors=(btop htop); has_nvidia && monitors+=(nvtop)
+    for pkg in "${monitors[@]}"; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 1 "Instalar $pkg" apt install -y "$pkg"
     done
 
     ui_panel_end; ui_ok "Módulo 05 completado"
-    echo ""; ui_info "Tips GTX 1660 SUPER:"
+    echo ""; ui_info "Tips:"
     echo -e "  ${C_DIM}• Steam: activar Proton para todos los juegos${C_RESET}"
     echo -e "  ${C_DIM}• Launch options: gamemoderun %command%${C_RESET}"
     echo -e "  ${C_DIM}• MangoHud: MANGOHUD=1 %command%${C_RESET}"

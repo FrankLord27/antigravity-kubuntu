@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP — lib/ui.sh  [Kubuntu 26.04 LTS]
+#  AUTO SETUP — lib/ui.sh  [Debian 13 / Ubuntu 26.04]
 #  Sistema de errores:
 #    Nivel 1 = WARNING  → registra y continúa automáticamente
 #    Nivel 2 = ERROR    → registra, salta el paso, continúa el módulo
@@ -13,16 +13,16 @@ export C_DIM='\033[2m' C_RESET='\033[0m'
 export ICON_OK="✓" ICON_FAIL="✗" ICON_WARN="⚠" ICON_INFO="●"
 export ICON_RUN="▶" ICON_SKIP="○" ICON_FATAL="☠"
 export AG_OK_COUNT=0 AG_ERROR_COUNT=0 AG_WARN_COUNT=0 AG_SKIP_COUNT=0
-export AG_LOG_DIR="/var/log/kubuntu-auto-setup"
+export AG_LOG_DIR="/var/log/auto-setup"
 export AG_LOG_FILE="${AG_LOG_DIR}/$(date '+%Y-%m-%d_%H-%M-%S').log"
 
 ui_log_init() {
     mkdir -p "$AG_LOG_DIR"
     cat > "$AG_LOG_FILE" << EOF
-# KUBUNTU AUTO SETUP BOOTSTRAP — LOG [Kubuntu 26.04 LTS]
+# AUTO SETUP — LOG
 # Fecha    : $(date '+%Y-%m-%d %H:%M:%S')
 # Kernel   : $(uname -r)
-# Ubuntu   : $(source /etc/os-release 2>/dev/null && echo "$VERSION_ID - $VERSION_CODENAME")
+# Distro   : $(source /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")
 # Usuario  : ${SUDO_USER:-$USER}
 # Host     : $(hostname)
 EOF
@@ -56,12 +56,12 @@ ui_banner() {
     clear; echo ""
     echo -e "${C_CYAN}${C_BOLD}"
     echo "   ╔══════════════════════════════════════════════════════════╗"
-    echo "   ║      K U B U N T U   A U T O   S E T U P   T O O L       ║"
-    echo "   ║                  [ Kubuntu Edition ]                     ║"
-    echo "   ║   Kubuntu 26.04 LTS  •  GTX 1660 SUPER  •  i5-10400F     ║"
+    echo "   ║              A U T O   S E T U P   T O O L               ║"
+    echo "   ║           Debian 13  •  Ubuntu 26.04  •  KDE             ║"
     echo "   ╚══════════════════════════════════════════════════════════╝"
     echo -e "${C_RESET}"
-    echo -e "${C_GRAY}   $(date '+%A %d %b %Y')  •  $(date '+%H:%M')  •  Kernel: $(uname -r)${C_RESET}"; echo ""
+    local pretty; pretty=$(source /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")
+    echo -e "${C_GRAY}   $(date '+%A %d %b %Y')  •  $(date '+%H:%M')  •  ${pretty}  •  $(uname -r)${C_RESET}"; echo ""
 }
 
 ui_progress() {

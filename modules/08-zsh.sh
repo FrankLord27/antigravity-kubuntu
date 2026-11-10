@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  KUBUNTU AUTO SETUP — modules/08-zsh-kde.sh [Kubuntu 26.04 LTS]
+#  AUTO SETUP — modules/08-zsh.sh [Debian 13 / Ubuntu 26.04]
 #  ZSH + Oh My Zsh + Powerlevel10k + MesloLGS NF
-#  + KDE Plasma 6 look macOS (nativo — sin software de terceros)
 #
 #  ORDEN:
 #  ① Backup de todo antes de tocar nada
@@ -11,10 +10,8 @@
 #  ④ Plugins: autosuggestions + syntax-highlighting + completions
 #  ⑤ Powerlevel10k + config predefinida (sin wizard al arrancar)
 #  ⑥ Fuentes MesloLGS NF (iconos de Powerlevel10k)
-#  ⑦ .zshrc completo con fnm, CUDA, aliases, docker, git
+#  ⑦ .zshrc completo con nvm, aliases, docker, git
 #  ⑧ Konsole: perfil con MesloLGS NF como predeterminado
-#  ⑨ KDE Plasma 6: paneles macOS via DBus + kwriteconfig6
-#  ⑩ Idioma español del sistema
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -44,7 +41,7 @@ run_module_zsh() {
 # ─── FASE 1: BACKUP ──────────────────────────────────────────────────────────
 _backup_config() {
     local home="$1"
-    local bdir="${home}/.kubuntu-auto-setup-backup-$(date '+%Y%m%d_%H%M%S')"
+    local bdir="${home}/.auto-setup-backup-$(date '+%Y%m%d_%H%M%S')"
     ui_info "Creando backup de configuración existente..."
     mkdir -p "$bdir"
     local backed=false
@@ -125,11 +122,17 @@ _install_meslo_fonts() {
 # ─── FASE 7: .ZSHRC COMPLETO ─────────────────────────────────────────────────
 _write_zshrc() {
     local real_user="$1" home="$2"
-    local fnm_path="${home}/.local/share/fnm"
     ui_info "Escribiendo .zshrc completo..."
+    local cuda_block=""
+    [[ -d /usr/local/cuda ]] && cuda_block='
+# CUDA
+export PATH="/usr/local/cuda/bin:$PATH"
+export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"'
+    local gpu_alias=""
+    command -v nvidia-smi &>/dev/null && gpu_alias="alias gpu='nvidia-smi --query-gpu=name,driver_version,temperature.gpu,utilization.gpu --format=csv,noheader'"
     sudo -u "$real_user" tee "${home}/.zshrc" > /dev/null << ZSHRC
 # ============================================================
-#  .zshrc — KUBUNTU AUTO SETUP [Kubuntu 26.04 LTS]
+#  .zshrc — AUTO SETUP [Debian 13 / Ubuntu 26.04]
 #  Frank Felix Rodríguez — $(date '+%Y-%m-%d')
 # ============================================================
 
@@ -150,13 +153,11 @@ source \$ZSH/oh-my-zsh.sh
 HISTSIZE=10000; SAVEHIST=10000; HISTFILE=~/.zsh_history
 setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY
 
-# fnm — Fast Node Manager
-export PATH="${fnm_path}:\$PATH"
-eval "\$(fnm env --use-on-cd 2>/dev/null)"
-
-# CUDA 12.8
-export PATH="/usr/local/cuda/bin:\$PATH"
-export LD_LIBRARY_PATH="/usr/local/cuda/lib64:\$LD_LIBRARY_PATH"
+# nvm — Node Version Manager (Node ${NODE_VERSION:-26} + pnpm via corepack)
+export NVM_DIR="\$HOME/.nvm"
+[ -s "\$NVM_DIR/nvm.sh" ] && \\. "\$NVM_DIR/nvm.sh"
+[ -s "\$NVM_DIR/bash_completion" ] && \\. "\$NVM_DIR/bash_completion"
+${cuda_block}
 
 # Herramientas modernas
 command -v eza &>/dev/null && {
@@ -193,11 +194,12 @@ alias myip='curl -s ifconfig.me'
 alias update='sudo apt update && sudo apt upgrade -y'
 alias sysinfo='inxi -Fxz'
 alias temp='sensors 2>/dev/null | grep -E "temp|Core|fan"'
-alias gpu='nvidia-smi --query-gpu=name,driver_version,temperature.gpu,utilization.gpu --format=csv,noheader'
+${gpu_alias}
 
-# Kubuntu Auto Setup
-alias ag-diag='sudo bash \$HOME/kubuntu-auto-setup/modules/00-diagnostics.sh'
-alias ag-verify='sudo bash \$HOME/kubuntu-auto-setup/modules/07-verify.sh'
+# Auto Setup
+alias ag-setup='sudo bash \$HOME/antigravity-kubuntu/setup.sh'
+alias ag-diag='sudo bash \$HOME/antigravity-kubuntu/modules/00-diagnostics.sh'
+alias ag-verify='sudo bash \$HOME/antigravity-kubuntu/modules/07-verify.sh'
 
 # Autocompletado
 autoload -Uz compinit && compinit
@@ -220,7 +222,7 @@ ZSHRC
 _write_p10k_config() {
     local home="$1" real_user="$2"
     sudo -u "$real_user" tee "${home}/.p10k.zsh" > /dev/null << 'P10K'
-# Powerlevel10k config — KUBUNTU AUTO SETUP
+# Powerlevel10k config — AUTO SETUP
 'builtin' 'local' '-a' 'p10k_config_opts'
 [[ ! -o 'aliases'         ]] || p10k_config_opts+=('aliases')
 [[ ! -o 'sh_glob'         ]] || p10k_config_opts+=('sh_glob')
@@ -275,8 +277,8 @@ _configure_konsole() {
     local real_user="$1" home="$2"
     local kdir="${home}/.local/share/konsole"
     sudo -u "$real_user" mkdir -p "$kdir"
-    local pf="${kdir}/Kubuntu Auto Setup.profile"
-    [[ -f "$pf" ]] && ui_skip "Perfil Konsole Kubuntu Auto Setup ya existe" || {
+    local pf="${kdir}/Auto Setup.profile"
+    [[ -f "$pf" ]] && ui_skip "Perfil Konsole Auto Setup ya existe" || {
         sudo -u "$real_user" tee "$pf" > /dev/null << 'PROFILE'
 [Appearance]
 ColorScheme=Breeze
@@ -284,7 +286,7 @@ Font=MesloLGS NF,13,-1,5,50,0,0,0,0,0
 
 [General]
 Command=/usr/bin/zsh
-Name=Kubuntu Auto Setup
+Name=Auto Setup
 Parent=FALLBACK/
 TerminalColumns=120
 TerminalRows=30
@@ -293,18 +295,18 @@ TerminalRows=30
 HistorySize=10000
 ScrollBarPosition=2
 PROFILE
-        ui_ok "Perfil Konsole 'Kubuntu Auto Setup' creado con MesloLGS NF"
+        ui_ok "Perfil Konsole 'Auto Setup' creado con MesloLGS NF"
     }
 
     local konsolerc="${home}/.config/konsolerc"
-    if grep -q 'Kubuntu Auto Setup' "$konsolerc" 2>/dev/null; then
-        ui_skip "Perfil Kubuntu Auto Setup ya predeterminado"
+    if grep -q 'Auto Setup' "$konsolerc" 2>/dev/null; then
+        ui_skip "Perfil Auto Setup ya predeterminado"
     else
         sudo -u "$real_user" bash -c \
             "grep -q 'DefaultProfile' '$konsolerc' 2>/dev/null && \
-            sed -i 's/DefaultProfile=.*/DefaultProfile=Kubuntu Auto Setup.profile/' '$konsolerc' || \
-            { mkdir -p '${home}/.config'; printf '[Desktop Entry]\nDefaultProfile=Kubuntu Auto Setup.profile\n' >> '$konsolerc'; }"
-        ui_ok "Perfil Kubuntu Auto Setup establecido como predeterminado"
+            sed -i 's/DefaultProfile=.*/DefaultProfile=Auto Setup.profile/' '$konsolerc' || \
+            { mkdir -p '${home}/.config'; printf '[Desktop Entry]\nDefaultProfile=Auto Setup.profile\n' >> '$konsolerc'; }"
+        ui_ok "Perfil Auto Setup establecido como predeterminado"
     fi
 }
 
@@ -323,7 +325,7 @@ _show_post_instructions() {
     echo -e "  │  ${C_WHITE}3.${C_RESET} Para reconfigurar tema ZSH: ${C_DIM}p10k configure${C_RESET}          │"
     echo -e "  │                                                            │"
     echo -e "  │                                                            │"
-    printf  "  │  ${C_WHITE}Backup:${C_RESET} ${C_DIM}~/.kubuntu-auto-setup-backup-*${C_RESET}%-26s│\n" ""
+    printf  "  │  ${C_WHITE}Backup:${C_RESET} ${C_DIM}~/.auto-setup-backup-*${C_RESET}%-34s│\n" ""
     echo -e "  └────────────────────────────────────────────────────────────┘"
     echo ""
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KUBUNTU AUTO SETUP — modules/00-diagnostics.sh [Kubuntu 26.04 LTS]
+# AUTO SETUP — modules/00-diagnostics.sh [Debian 13 / Ubuntu 26.04]
 # Diagnóstico: hardware, componentes, logs arranque, armonía, Health Score 0-100
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,7 +7,7 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
 run_diagnostics() {
-    ui_step "DIAGNÓSTICO DEL SISTEMA — Kubuntu 26.04 LTS"
+    ui_step "DIAGNÓSTICO DEL SISTEMA"
     ui_info "Analizando sistema..."; echo ""
     detect_all; detect_harmony
     _show_hardware; _show_component_status
@@ -21,7 +21,7 @@ _show_hardware() {
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "CPU:"         "${DETECT_CPU:0:34}"
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "RAM:"         "${DETECT_RAM_GB} GB"
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Kernel:"      "$DETECT_KERNEL"
-    printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Ubuntu:"      "$DETECT_UBUNTU_VER ($DETECT_UBUNTU_CODENAME)"
+    printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Distro:"      "${DETECT_DISTRO^} $DETECT_OS_VER ($DETECT_OS_CODENAME)"
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Filesystem:"  "$DETECT_DISK_FS"
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Disco libre:" "${DETECT_DISK_FREE_GB} GB"
     printf "  │  ${C_CYAN}%-22s${C_RESET} %-34s│\n" "Sesión:"      "$DETECT_SESSION_TYPE"
