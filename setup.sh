@@ -59,9 +59,10 @@ declare -A MODULE_NAME=(
     [11]="Gaming (Steam + Lutris + Vulkan + MangoHud)"
     [12]="Impresoras y escáner"
     [13]="Claude Code + ai-lordkit"
+    [14]="Tema Arcade Tokyo (escritorio retro de 8 bits)"
     [90]="Verificación final del sistema"
 )
-MODULE_IDS=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 90)
+MODULE_IDS=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 90)
 
 declare -A MODULE_FILE=(
     [0]="${SCRIPT_DIR}/modules/00-diagnostics.sh"
@@ -78,6 +79,7 @@ declare -A MODULE_FILE=(
     [11]="${SCRIPT_DIR}/modules/11-gaming.sh"
     [12]="${SCRIPT_DIR}/modules/12-printing.sh"
     [13]="${SCRIPT_DIR}/modules/13-claude.sh"
+    [14]="${SCRIPT_DIR}/modules/14-theme.sh"
     [90]="${SCRIPT_DIR}/modules/90-verify.sh"
 )
 
@@ -96,15 +98,17 @@ declare -A MODULE_FUNC=(
     [11]="run_module_gaming"
     [12]="run_module_printing"
     [13]="run_module_claude"
+    [14]="run_module_theme"
     [90]="run_module_verify"
 )
 
 # Instalación completa. NVIDIA (3) solo si se detecta GPU NVIDIA. El orden importa:
 # drivers antes del escritorio, zsh antes de git y de Claude (ai-lordkit engancha en .zshrc).
+# El tema (14) va después de zsh: añade su cartel a .zshrc. Se desactiva en configs/theme.conf.
 _full_install_order() {
     local order=(1 2)
     has_nvidia && order+=(3)
-    order+=(4 5 6 7 8 9 10 11 12 13 90)
+    order+=(4 5 6 7 8 9 10 11 12 13 14 90)
     echo "${order[@]}"
 }
 
@@ -127,6 +131,7 @@ _module_status() {
         11) { is_deb_installed steam-installer || is_deb_installed steam; } && echo "OK" || echo "pendiente" ;;
         12) is_deb_installed cups && echo "OK" || echo "pendiente" ;;
         13) [[ -x "${real_home}/.claude/hooks/guard.sh" ]] && echo "OK" || echo "pendiente" ;;
+        14) [[ -d "${real_home}/.local/share/plasma/plasmoids/com.frankf.arcadedeck" ]] && echo "OK" || echo "pendiente" ;;
         90) echo "verificar" ;;
     esac
 }

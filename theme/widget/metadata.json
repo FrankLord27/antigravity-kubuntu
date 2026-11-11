@@ -1,0 +1,13 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Id": "com.frankf.arcadedeck",
+        "Name": "Arcade Deck",
+        "Description": "Dock con zoom, medidores de CPU/GPU/RAM y reloj estilo arcade",
+        "Icon": "input-gaming",
+        "Category": "System Information",
+        "License": "GPL-2.0+",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
