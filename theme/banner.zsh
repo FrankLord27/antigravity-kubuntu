@@ -64,24 +64,28 @@
   if [[ -t 1 ]] && zmodload zsh/zselect 2>/dev/null; then
     steps=8
   fi
+  # La animación se dibuja en la pantalla alternativa de la terminal y el cuadro final en la
+  # normal. Redibujar encima con «subir cursor» dejaba líneas repetidas en el historial cuando
+  # la ventana aún se estaba abriendo y cambiaba de tamaño.
   local -a spr info
-  print
-  (( steps > 1 )) && print -n $'\e[?25l'            # oculta el cursor mientras se anima
+  (( steps > 1 )) && print -n $'\e[?1049h\e[?25l'
   for (( k = 1; k <= steps; k++ )); do
     info=( "${cy}${USER}@${HOST}${rs}  ${mu}encendido ${fg}${uptxt}${rs}" )
     bar $(( cpu_pct * k / steps ));  info+="${pu}CPU  ${rs} ${REPLY} ${fg}carga ${load}${mu} / ${cores} núcleos${rs}"
     bar $(( mem_pct * k / steps ));  info+="${pu}RAM  ${rs} ${REPLY} ${fg}${mem_txt}${rs}"
     bar $(( disk_pct * k / steps )); info+="${pu}DISCO${rs} ${REPLY} ${fg}${disk_txt}${rs}"
     if (( k < steps && k % 2 )); then spr=( $spr2 ); else spr=( $spr1 ); fi
+    if (( k == steps && steps > 1 )); then
+      print -n $'\e[?1049l\e[?25h'                   # vuelve a la pantalla normal para el cuadro final
+    elif (( steps > 1 )); then
+      print -n $'\e[H'                               # esquina superior: cada cuadro pisa al anterior
+    fi
+    print
     for (( i = 1; i <= 4; i++ )); do
       print -r -- "  ${pu}${spr[i]}${rs}   ${info[i]}"$'\e[K'
     done
-    if (( k < steps )); then
-      zselect -t 6                                   # 60 ms entre cuadros
-      print -n $'\e[4A'                              # sube 4 líneas para redibujar encima
-    fi
+    (( k < steps )) && zselect -t 6                  # 60 ms entre cuadros
   done
-  (( steps > 1 )) && print -n $'\e[?25h'
   unfunction bar
   print
 }
