@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# AUTO SETUP — modules/07-verify.sh [Debian 13 / Ubuntu 26.04]
+# AUTO SETUP — modules/90-verify.sh [Debian 13 / Ubuntu 26.04]
 # Verificación completa post-instalación + Health Score final
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
+source "${SCRIPT_DIR}/modules/02-drivers.sh"
 
 run_module_verify() {
-    ui_step "MÓDULO 07 — VERIFICACIÓN FINAL DEL SISTEMA"
+    ui_step "VERIFICACIÓN FINAL DEL SISTEMA"
     detect_all; detect_harmony
     has_nvidia && _verify_nvidia
-    _verify_docker; _verify_dev; _verify_gaming
+    _verify_desktop; _verify_docker; _verify_dev; _verify_gaming
     _verify_system; _verify_harmony_final; _show_final_score; _show_next_steps
 }
 
@@ -21,7 +22,14 @@ _verify_nvidia() {
         local info; info=$(nvidia-smi --query-gpu=name,driver_version,temperature.gpu,utilization.gpu --format=csv,noheader 2>/dev/null)
         ui_ok "nvidia-smi OK"; echo -e "  ${C_DIM}$info${C_RESET}"
         nvidia-smi 2>/dev/null >> "$AG_LOG_FILE" || true
-    } || { ui_fail "nvidia-smi FALLA — driver no cargado"; ui_warn "journalctl -b | grep -i nvidia"; }
+    } || {
+        if dkms status 2>/dev/null | grep -i nvidia | grep -qi installed; then
+            ui_ok "Driver NVIDIA compilado por DKMS — se cargará al reiniciar"
+        else
+            ui_fail "El driver NVIDIA NO está compilado para este kernel — NO reinicies a ciegas"
+            ui_warn "Mira: dkms status ; sudo bash modules/03-nvidia.sh ; guía: docs/GUIA-INSTALACION.md (sección NVIDIA)"
+        fi
+    }
 
     local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "")
     if is_ubuntu && [[ -n "$drv_ver" ]]; then
@@ -36,7 +44,7 @@ _verify_nvidia() {
     fi
 
     local mods; mods=$(lsmod 2>/dev/null | grep '^nvidia' | awk '{print $1}' | tr '\n' ' ')
-    [[ -n "$mods" ]] && ui_ok "Módulos NVIDIA: $mods" || ui_fail "Ningún módulo NVIDIA cargado — reinicia"
+    [[ -n "$mods" ]] && ui_ok "Módulos NVIDIA: $mods" || ui_info "Módulos NVIDIA aún no cargados (normal antes de reiniciar)"
 
     lsmod 2>/dev/null | grep -q '^nouveau' \
         && ui_fail "nouveau ACTIVO — conflicto con driver propietario" \
@@ -59,13 +67,9 @@ _verify_nvidia() {
         && ui_ok "nvidia-drm.fbdev=1 activo — TTY funcional en Wayland" \
         || ui_warn "nvidia-drm.fbdev=1 no configurado"
 
-    for svc in nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service; do
-        is_service_enabled "$svc" && ui_ok "$svc habilitado" || ui_warn "$svc NO habilitado"
-    done
-
-    grep -q 'NVreg_PreserveVideoMemoryAllocations=1' /etc/modprobe.d/nvidia-power.conf 2>/dev/null \
-        && ui_ok "Preservación de VRAM configurada" \
-        || ui_warn "NVreg_PreserveVideoMemoryAllocations no configurado"
+    grep -rqs 'NVreg_PreserveVideoMemoryAllocations' /etc/modprobe.d/ \
+        && ui_ok "Opciones de suspensión NVIDIA configuradas" \
+        || ui_info "Opciones de suspensión: las de fábrica del driver"
 
     { [[ -d /sys/module/ntsync ]] || lsmod 2>/dev/null | grep -q ntsync; } \
         && ui_ok "NTSYNC activo — gaming Proton optimizado" \
@@ -88,6 +92,19 @@ _verify_nvidia() {
     fi
 }
 
+_verify_desktop() {
+    ui_step "Verificando Escritorio y Drivers"
+    is_deb_installed plasma-desktop && ui_ok "KDE Plasma instalado" || ui_fail "KDE Plasma NO instalado — módulo 4"
+    is_service_enabled sddm && ui_ok "SDDM (login gráfico) habilitado" || ui_warn "SDDM no habilitado — módulo 4"
+    is_deb_installed kwin-x11 && ui_ok "Sesión X11 de respaldo disponible" || ui_warn "Sin sesión X11 de respaldo — módulo 4"
+    is_deb_installed network-manager && ui_ok "NetworkManager instalado" || ui_fail "NetworkManager NO instalado — módulo 4"
+    is_deb_installed pipewire-audio || is_deb_installed pipewire-pulse && ui_ok "Audio PipeWire instalado" || ui_warn "PipeWire no instalado — módulo 4"
+    is_deb_installed libavcodec-extra && ui_ok "Códecs multimedia instalados" || ui_warn "Códecs no instalados — módulo 4"
+    is_deb_installed firmware-linux || is_deb_installed linux-firmware && ui_ok "Firmware instalado" || ui_fail "Firmware NO instalado — módulo 2"
+    command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q 'Status: active' && ui_ok "Firewall activo" || ui_warn "Firewall inactivo — módulo 4"
+    report_unbound_devices
+}
+
 _verify_docker() {
     ui_step "Verificando Docker"
     is_service_active docker && ui_ok "Docker: $(docker --version 2>/dev/null)" \
@@ -108,26 +125,28 @@ _verify_dev() {
     # node/pnpm/agentes viven en el nvm del usuario real
     local probe='[[ -s "$HOME/.nvm/nvm.sh" ]] && source "$HOME/.nvm/nvm.sh" >/dev/null 2>&1; '
     local node_ver; node_ver=$(sudo -u "$real_user" HOME="$real_home" bash -c "${probe}node -v 2>/dev/null")
-    [[ -n "$node_ver" ]] && ui_ok "Node.js: $node_ver" || ui_fail "Node.js no encontrado — instala módulo 4"
+    [[ -n "$node_ver" ]] && ui_ok "Node.js: $node_ver" || ui_fail "Node.js no encontrado — módulo 6"
     local pnpm_ver; pnpm_ver=$(sudo -u "$real_user" HOME="$real_home" bash -c "${probe}pnpm -v 2>/dev/null")
-    [[ -n "$pnpm_ver" ]] && ui_ok "pnpm: $pnpm_ver" || ui_fail "pnpm no encontrado — instala módulo 4"
-    for cli in claude codex gemini; do
+    [[ -n "$pnpm_ver" ]] && ui_ok "pnpm: $pnpm_ver" || ui_fail "pnpm no encontrado — módulo 6"
+    [[ -x "${real_home}/.local/bin/claude" ]] && ui_ok "Claude Code instalado" || ui_warn "Claude Code no encontrado — módulo 13"
+    [[ -x "${real_home}/.claude/hooks/guard.sh" ]] && ui_ok "ai-lordkit aplicado (~/.claude)" || ui_warn "ai-lordkit no aplicado — módulo 13"
+    for cli in codex gemini; do
         sudo -u "$real_user" HOME="$real_home" bash -c "${probe}command -v $cli" &>/dev/null \
-            && ui_ok "Agente IA: $cli" || ui_warn "Agente IA '$cli' no encontrado — instala módulo 4"
+            && ui_ok "Agente IA: $cli" || ui_warn "Agente IA '$cli' no encontrado — módulo 6"
     done
     is_deb_installed orca-ide && ui_ok "Orca (gestor de agentes) instalado" \
-        || ui_warn "Orca no instalado — instala módulo 4"
+        || ui_warn "Orca no instalado — módulo 6"
 
     is_cmd_available code && ui_ok "VS Code: $(code --version 2>/dev/null | head -1)" \
-        || ui_warn "VS Code no en PATH — instala módulo 4"
+        || ui_warn "VS Code no en PATH — módulo 6"
     { is_cmd_available google-chrome || is_cmd_available google-chrome-stable; } \
-        && ui_ok "Google Chrome instalado" || ui_warn "Chrome no encontrado — instala módulo 4"
+        && ui_ok "Google Chrome instalado" || ui_warn "Chrome no encontrado — módulo 6"
     is_cmd_available git && ui_ok "$(git --version 2>/dev/null)" \
         || ui_fail "Git no encontrado — instala módulo 1"
     is_cmd_available zsh && ui_ok "Zsh: $(zsh --version 2>/dev/null | head -1)" \
-        || ui_warn "Zsh no instalado — instala módulo 8"
+        || ui_warn "Zsh no instalado — módulo 7"
     [[ -d "${real_home}/.oh-my-zsh" ]] && ui_ok "Oh My Zsh instalado" \
-        || ui_warn "Oh My Zsh no encontrado — instala módulo 8"
+        || ui_warn "Oh My Zsh no encontrado — módulo 7"
     [[ -f "${real_home}/.p10k.zsh" ]] && ui_ok "Powerlevel10k configurado" \
         || ui_info ".p10k.zsh no encontrado — ejecuta 'p10k configure' en la terminal"
 
@@ -137,11 +156,12 @@ _verify_dev() {
     if [[ -n "$gn" ]] && [[ -n "$ge" ]]; then
         ui_ok "Git identidad: $gn <$ge>"
     else
-        ui_warn "Git identidad no configurada — ejecuta módulo 10"
+        ui_warn "Git identidad no configurada — módulo 8"
     fi
 }
 
 _verify_gaming() {
+    { is_deb_installed steam-installer || is_deb_installed steam || is_deb_installed lutris; } || return 0
     ui_step "Verificando Gaming"
     { is_deb_installed steam-installer || is_deb_installed steam; } && ui_ok "Steam" || ui_warn "Steam no instalado"
     is_deb_installed lutris   && ui_ok "Lutris"   || ui_warn "Lutris no instalado"
@@ -166,9 +186,9 @@ _verify_system() {
     local bf; bf=$(df -BM /boot 2>/dev/null | awk 'NR==2{gsub("M",""); print $4}')
     [[ -n "$bf" ]] && { [[ "$bf" -lt 200 ]] && ui_warn "/boot casi lleno (${bf}MB)" || ui_ok "/boot: ${bf}MB libre"; }
 
-    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_info "Timeshift no instalado (opcional, módulo 6)"
-    [[ -b /dev/zram0 ]] && ui_ok "ZRAM activo" || ui_info "ZRAM no activo (opcional, módulo 6)"
-    is_service_enabled fstrim.timer && ui_ok "TRIM SSD habilitado" || ui_info "TRIM SSD no habilitado (opcional, módulo 6)"
+    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_info "Timeshift no instalado (módulo 10)"
+    [[ -b /dev/zram0 ]] && ui_ok "ZRAM activo" || ui_info "ZRAM no activo (módulo 10)"
+    is_service_enabled fstrim.timer && ui_ok "TRIM SSD habilitado" || ui_info "TRIM SSD no habilitado (módulo 10)"
 
     silent_cmd nvidia-smi && {
         local t; t=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null)
@@ -212,17 +232,17 @@ _show_final_score() {
 
 _show_next_steps() {
     echo ""
-    echo -e "${C_BOLD}  ┌─ PRÓXIMOS PASOS ──────────────────────────────────────┐${C_RESET}"
-    echo -e "  │  ${C_WHITE}1.${C_RESET} Reinicia: ${C_DIM}sudo reboot${C_RESET}                                 │"
-    echo -e "  │  ${C_WHITE}2.${C_RESET} Login de agentes: ${C_DIM}claude · codex login · gemini${C_RESET}    │"
-    echo -e "  │  ${C_WHITE}3.${C_RESET} Abre Orca y añade tus proyectos                   │"
-    echo -e "  │  ${C_WHITE}4.${C_RESET} GitHub: ${C_DIM}gh auth login${C_RESET} y sube la clave SSH        │"
-    echo -e "  │  ${C_WHITE}5.${C_RESET} Diagnóstico: ${C_DIM}sudo bash modules/00-diagnostics.sh${C_RESET}  │"
-    printf  "  │  Log: ${C_DIM}%-51s${C_RESET}│\n" "$AG_LOG_FILE"
-    echo -e "  └───────────────────────────────────────────────────────┘"; echo ""
+    echo -e "${C_BOLD}  PRÓXIMOS PASOS${C_RESET}"
+    echo -e "  ${C_WHITE}1.${C_RESET} Reinicia:  ${C_CYAN}sudo reboot${C_RESET}"
+    echo -e "  ${C_WHITE}2.${C_RESET} En la pantalla de login elige la sesión ${C_CYAN}Plasma (Wayland)${C_RESET}; si ves parpadeos, ${C_CYAN}Plasma (X11)${C_RESET}"
+    echo -e "  ${C_WHITE}3.${C_RESET} Inicia sesión en los agentes:  ${C_CYAN}claude${C_RESET} · ${C_CYAN}codex login${C_RESET} · ${C_CYAN}gemini${C_RESET}"
+    echo -e "  ${C_WHITE}4.${C_RESET} GitHub:  ${C_CYAN}gh auth login${C_RESET}  y sube tu clave SSH (la muestra: cat ~/.ssh/id_ed25519.pub)"
+    echo -e "  ${C_WHITE}5.${C_RESET} Comprueba todo otra vez tras reiniciar:  ${C_CYAN}ag-verify${C_RESET}"
+    echo -e "  ${C_DIM}Guía completa: ~/antigravity-kubuntu/docs/GUIA-INSTALACION.md${C_RESET}"
+    echo -e "  ${C_DIM}Log: ${AG_LOG_FILE}${C_RESET}"; echo ""
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/07-verify.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/90-verify.sh" && exit 1
     ui_log_init; run_module_verify
 fi

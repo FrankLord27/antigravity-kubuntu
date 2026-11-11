@@ -1,3 +1,4 @@
 .claude/
 .directory
 *.log
+configs/local.conf
