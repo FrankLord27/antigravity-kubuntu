@@ -137,7 +137,7 @@ _verify_dev() {
     is_deb_installed orca-ide && ui_ok "Orca (gestor de agentes) instalado" \
         || ui_warn "Orca no instalado — módulo 6"
 
-    is_cmd_available code && ui_ok "VS Code: $(code --version 2>/dev/null | head -1)" \
+    is_deb_installed code && ui_ok "VS Code: $(dpkg-query -W -f='${Version}' code 2>/dev/null)" \
         || ui_warn "VS Code no en PATH — módulo 6"
     { is_cmd_available google-chrome || is_cmd_available google-chrome-stable; } \
         && ui_ok "Google Chrome instalado" || ui_warn "Chrome no encontrado — módulo 6"
@@ -186,7 +186,7 @@ _verify_system() {
     local bf; bf=$(df -BM /boot 2>/dev/null | awk 'NR==2{gsub("M",""); print $4}')
     [[ -n "$bf" ]] && { [[ "$bf" -lt 200 ]] && ui_warn "/boot casi lleno (${bf}MB)" || ui_ok "/boot: ${bf}MB libre"; }
 
-    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_info "Timeshift no instalado (módulo 10)"
+    is_deb_installed timeshift && ui_ok "Timeshift instalado" || ui_info "Timeshift no instalado (módulo 4)"
     [[ -b /dev/zram0 ]] && ui_ok "ZRAM activo" || ui_info "ZRAM no activo (módulo 10)"
     is_service_enabled fstrim.timer && ui_ok "TRIM SSD habilitado" || ui_info "TRIM SSD no habilitado (módulo 10)"
 
@@ -196,7 +196,7 @@ _verify_system() {
         [[ "$t" -gt 85 ]] && ui_warn "GPU temperatura alta (${t}°C)"
     }
 
-    local kerr; kerr=$(journalctl -b -k -p err --no-pager 2>/dev/null | grep -vc '^--' || echo 0)
+    local kerr; kerr=$(journalctl -b -k -p err --no-pager 2>/dev/null | grep -vc '^--'); kerr=${kerr:-0}
     [[ "$kerr" -eq 0 ]] && ui_ok "Sin errores del kernel en este arranque" \
         || { [[ "$kerr" -le 10 ]] && ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)" \
         || ui_warn "$kerr error(s) del kernel — journalctl -b -k -p err"; }

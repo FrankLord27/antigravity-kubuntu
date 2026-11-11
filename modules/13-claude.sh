@@ -68,7 +68,9 @@ run_module_claude() {
     if [[ -x "${rh}/.local/bin/claude" && -x "${rh}/.claude/hooks/guard.sh" ]]; then
         ui_ok "Claude Code + ai-lordkit instalados (${warns:-0} avisos, ${errs:-0} errores en el log)"
     else
-        ui_fail "ai-lordkit no terminó (rc=$rc) — revisa ${log}"
+        ui_fail "ai-lordkit no terminó (rc=$rc) — revisa ${log} y repite: sudo bash modules/13-claude.sh"
+        grep -E '\[✗\]' "$log" | sed 's/\x1b\[[0-9;]*m//g' | head -5 | while IFS= read -r l; do echo -e "      ${C_DIM}${l:0:120}${C_RESET}"; done
+        ui_panel_end; return 1
     fi
     if [[ "${errs:-0}" -gt 0 || "${warns:-0}" -gt 0 ]]; then
         grep -E '\[✗\]|\[!\]' "$log" | sed 's/\x1b\[[0-9;]*m//g' | head -12 | while IFS= read -r l; do

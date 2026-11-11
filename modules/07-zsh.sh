@@ -157,6 +157,7 @@ setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY
 export NVM_DIR="\$HOME/.nvm"
 [ -s "\$NVM_DIR/nvm.sh" ] && \\. "\$NVM_DIR/nvm.sh"
 [ -s "\$NVM_DIR/bash_completion" ] && \\. "\$NVM_DIR/bash_completion"
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0   # que pnpm (corepack) no pregunte al bajarse
 ${cuda_block}
 
 # Herramientas modernas
@@ -220,7 +221,7 @@ bindkey '^ ' autosuggest-accept
 # Powerlevel10k
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
-# Claude Code (ai-lordkit): `claude --modo X`, `claude --kimi`
+# Claude Code (ai-lordkit): habilita claude --modo X y claude --kimi
 [ -f "\$HOME/.claude/shell-init.sh" ] && . "\$HOME/.claude/shell-init.sh"
 
 # TUS ajustes van en ~/.zshrc.local: este archivo se regenera, ese nunca se toca.

@@ -1,104 +1,75 @@
-# Auto Setup — Debian 13 / Ubuntu 26.04 (KDE)
+# Auto Setup — Debian 13 (KDE)
 
-Script que deja una instalación limpia de **Debian** (o Ubuntu) con todos mis programas de desarrollo listos, con un solo comando. Detecta el hardware: si no hay GPU NVIDIA, no instala nada de NVIDIA.
+Deja un Debian recién instalado listo para trabajar con un solo comando: drivers y firmware,
+escritorio KDE, NVIDIA, Docker, stack de desarrollo, apps y Claude Code con
+[ai-lordkit](https://github.com/FrankLord27/ai-lordkit). También funciona en Ubuntu.
 
-## Instalación tras formatear
+**Guía completa, paso a paso: [docs/GUIA-INSTALACION.md](docs/GUIA-INSTALACION.md)**
 
-Abre una terminal y pega:
+## Resumen
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/FrankLord27/antigravity-kubuntu/main/install.sh | bash
-```
+1. **Antes de formatear**, en tu sistema actual: `bash tools/pre-format.sh` (dice qué respaldar
+   y guarda el inventario de hardware).
+2. **Instala Debian 13** con la ISO netinst normal. Marca *KDE Plasma* y *Utilidades estándar*.
+   Secure Boot desactivado.
+3. **Abre una terminal y pega:**
 
-Pide la contraseña de `sudo` una vez e instala todo sin preguntas. Al final, reinicia.
+   ```bash
+   wget -qO- https://raw.githubusercontent.com/FrankLord27/antigravity-kubuntu/main/install.sh | bash
+   ```
 
-> **Antes de instalar Debian:** descarga la ISO **netinst con firmware incluido** (`debian-13.x-amd64-netinst.iso` de la carpeta `firmware/`). Sin ella, el Wi-Fi Intel de la laptop no funciona al arrancar y el comando de arriba no tiene internet.
+   Pide tu contraseña y tu nombre y email para git. No pregunta nada más.
+4. **Reinicia** y haz los inicios de sesión: `claude`, `gh auth login`, `codex login`, `gemini`.
 
-> **Repo privado:** el comando `curl` solo funciona si el repo es público. Si lo mantienes privado, usa:
->
-> ```bash
-> sudo apt install -y git gh && gh auth login && gh repo clone FrankLord27/antigravity-kubuntu ~/antigravity-kubuntu && sudo bash ~/antigravity-kubuntu/setup.sh --auto
-> ```
+## Qué instala
 
-## Qué instala la instalación completa
+| # | Módulo | Qué hace |
+| --- | --- | --- |
+| 1 | Sistema base | Repos `contrib`/`non-free`, actualización, herramientas, `sudo`, parches de seguridad automáticos |
+| 2 | Drivers y firmware | Firmware completo (Wi-Fi, Bluetooth, red, audio, video), microcode, headers. Avisa de dispositivos sin driver |
+| 3 | NVIDIA | Solo si hay GPU NVIDIA. Debian: repo oficial de NVIDIA, rama 610 propietaria. Ubuntu: rama 580 |
+| 4 | Escritorio | KDE si falta, sesión X11 de respaldo, audio, Bluetooth, códecs, fuentes, firewall |
+| 5 | Docker | Docker CE + Compose + Portainer |
+| 6 | Desarrollo | nvm + Node 26 + pnpm, VS Code, Chrome, Codex, Gemini, Orca, Flatpak |
+| 7 | Terminal | zsh + Oh My Zsh + Powerlevel10k |
+| 8 | Git | Identidad, alias, clave SSH, firma de commits, GitHub CLI |
+| 9 | Apps | GIMP, OBS, Krita, Blender, Thunderbird, VLC, AnyDesk, TeamViewer, Discord… |
+| 10 | Rendimiento | zram, earlyoom, TRIM, inotify |
+| 11 | Gaming | Steam, Lutris, Wine, MangoHud, GameMode |
+| 12 | Impresión | CUPS, drivers, escaneo |
+| 13 | Claude | Claude Code + ai-lordkit |
+| 90 | Verificación | Revisa todo y dice qué falta |
 
-| #   | Módulo       | Qué hace                                                                                                                                                   |
-| --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Sistema base | `apt full-upgrade`, repos `contrib/non-free` (Debian) o `universe/multiverse` (Ubuntu), firmware Wi-Fi/Bluetooth, microcode                                |
-| 2   | NVIDIA       | **Solo si hay GPU NVIDIA.** Debian: `nvidia-driver` (non-free). Ubuntu: rama 580                                                                           |
-| 3   | Docker CE    | Repo oficial de Docker para la distro + Portainer. GPU en contenedores solo si hay NVIDIA                                                                  |
-| 4   | Desarrollo   | **nvm + Node 26 + pnpm (corepack)**, VS Code, Google Chrome, **Claude Code + Codex CLI + Gemini CLI**, **Orca** (gestor de agentes de IA), Flatpak/Flathub |
-| 10  | Git          | Identidad, aliases, clave SSH ed25519, GitHub CLI, firma de commits                                                                                        |
-| 8   | ZSH          | Oh My Zsh + Powerlevel10k + plugins + fuente MesloLGS NF + perfil de Konsole                                                                               |
-| 12  | Apps         | gimp, obs-studio, krita, blender, thunderbird, discord, fritzing, librepcb, samba, remmina, vlc, mpv, AnyDesk, TeamViewer, Element (flatpak)…              |
-| 7   | Verificación | Reporte final y Health Score                                                                                                                               |
-
-Las listas de apps se editan en `configs/packages.conf`.
-
-## Módulos opcionales (solo desde el menú)
-
-No entran en la instalación automática. Se ejecutan a mano con `sudo bash setup.sh` y eligiendo el número:
-
-| #   | Módulo       | Qué hace                                                              |
-| --- | ------------ | --------------------------------------------------------------------- |
-| 5   | Gaming       | Steam, Lutris, Wine (WineHQ), Vulkan, MangoHud, GameMode, ProtonUp-Qt |
-| 6   | Optimización | sysctl, ZRAM, TRIM, PipeWire, Bluetooth, Timeshift, fuentes extra     |
-| 0   | Diagnóstico  | Hardware, drivers, logs de arranque, Health Score                     |
-
-## Después de instalar
-
-1. `sudo reboot`
-2. Login de los agentes de IA (una sola vez): `claude`, `codex login`, `gemini`
-3. Abre **Orca** desde el menú de aplicaciones y añade tus proyectos. Orca detecta los tres agentes y permite darle una tarea grande a uno para que la reparta entre los demás.
-4. `gh auth login` y sube la clave SSH que muestra el módulo 10.
+Las listas de programas y las versiones están en `configs/packages.conf`.
 
 ## Uso manual
 
 ```bash
-sudo bash setup.sh          # menú interactivo
-sudo bash setup.sh --auto   # instalación completa sin preguntas
-sudo bash modules/04-dev.sh # un módulo suelto
+sudo bash setup.sh                # menú
+sudo bash setup.sh --auto         # todo, sin menú
+sudo bash modules/06-dev.sh       # un módulo suelto
 ```
 
-Cada módulo detecta lo que ya está instalado y lo omite; es seguro repetirlo.
-
-Log de cada ejecución: `/var/log/auto-setup/YYYY-MM-DD_HH-MM-SS.log`
+Cada módulo salta lo que ya está instalado; se puede repetir. Log: `/var/log/auto-setup/`.
 
 ## Estructura
 
 ```
 antigravity-kubuntu/
-├── install.sh            # bootstrap de un comando (clona + ejecuta setup.sh --auto)
-├── setup.sh              # menú y orquestador
-├── configs/packages.conf # listas de paquetes y versiones (Node, nvm, apps)
-├── lib/
-│   ├── ui.sh             # colores, log, run_cmd
-│   └── detect.sh         # distro, hardware, NVIDIA, reglas de armonía
-└── modules/
-    ├── 00-diagnostics.sh
-    ├── 01-system.sh
-    ├── 02-nvidia.sh
-    ├── 03-docker.sh
-    ├── 04-dev.sh
-    ├── 05-gaming.sh          (opcional)
-    ├── 06-system-optimize.sh (opcional)
-    ├── 07-verify.sh
-    ├── 08-zsh.sh
-    ├── 10-git.sh
-    └── 12-apps.sh
+├── install.sh              # bootstrap de un comando (funciona sin sudo, curl ni git)
+├── setup.sh                # menú y orquestador
+├── configs/packages.conf   # listas de paquetes, versiones y driver NVIDIA
+├── lib/                    # ui.sh (salida y log), detect.sh (hardware), config.sh (tus datos)
+├── modules/                # un archivo por módulo (00 diagnóstico … 90 verificación)
+├── tools/pre-format.sh     # qué respaldar antes de formatear
+└── docs/GUIA-INSTALACION.md
 ```
-
-## Lo que ya no hace
-
-- **Tema de KDE** (paneles, iconos, decoración): se eliminó. Se reconstruye a mano tras instalar Debian.
-- **Snaps**: nada se instala por snap. Lo que no está en apt va por Flatpak.
-- **Ajustes del sistema** (ZRAM, sysctl, servicios): ya no son automáticos. Debian viene bien por defecto; el módulo 6 queda por si se quiere.
 
 ## Lo que NO debes hacer
 
 ```bash
 sudo bash NVIDIA-Linux-x86_64-*.run   # rompe apt y DKMS
-sudo snap install docker               # conflicto con Docker CE
+sudo snap install docker               # choca con Docker CE
 ```
 
 ## Autor

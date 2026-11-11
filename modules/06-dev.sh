@@ -32,16 +32,16 @@ _install_node() {
             "nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION}"
     fi
 
-    if _as_user_node "$real_user" "$real_home" "command -v pnpm &>/dev/null"; then
+    if _as_user_node "$real_user" "$real_home" "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm -v &>/dev/null"; then
         ui_skip "pnpm ya instalado"
     else
         run_cmd 2 "Instalar corepack + pnpm" _as_user_node "$real_user" "$real_home" \
-            "npm install -g corepack && corepack enable pnpm"
+            "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; npm install -g corepack && corepack enable pnpm && { corepack install -g pnpm@latest || corepack prepare pnpm@latest --activate; }"
     fi
 
     local nv pv
     nv=$(_as_user_node "$real_user" "$real_home" "node -v" 2>/dev/null || echo "?")
-    pv=$(_as_user_node "$real_user" "$real_home" "pnpm -v" 2>/dev/null || echo "?")
+    pv=$(_as_user_node "$real_user" "$real_home" "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm -v" 2>/dev/null || echo "?")
     ui_ok "Node ${nv} · pnpm ${pv}"
 }
 
