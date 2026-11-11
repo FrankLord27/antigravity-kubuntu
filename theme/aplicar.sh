@@ -245,10 +245,10 @@ _panels() {
     hud="$(sed -n 's/^HUD=\([0-9]*\) .*/\1/p' <<<"$out")"
     width="$(sed -n 's/^HUD=[0-9]* ANCHO=\([0-9]*\).*/\1/p' <<<"$out")"
     [[ -n "$hud" && -n "$width" ]] || return 0
-    x=$(( width - 960 - 16 )); (( x < 0 )) && x=0
+    x=$(( width - 947 - 16 )); (( x < 0 )) && x=0   # 947 = 592 x zoom 1.6 del HUD
     systemctl --user stop plasma-plasmashell.service || { echo "no se pudo parar plasmashell: el HUD queda arriba a la izquierda"; return 0; }
     sleep 2
-    sed -i -E "s/Applet-$hud:[0-9]+,[0-9]+,[0-9]+,[0-9]+,/Applet-$hud:$x,48,960,240,/g" "$rc" || true
+    sed -i -E "s/Applet-$hud:[0-9.]+,[0-9.]+,[0-9.]+,[0-9.]+,/Applet-$hud:$x,48,947,240,/g" "$rc" || true
     systemctl --user start plasma-plasmashell.service   # siempre se vuelve a arrancar, falle o no el cambio
 }
 
