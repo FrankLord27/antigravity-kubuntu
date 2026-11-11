@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "arcadesonidos",
+        "Name": "Arcade: sonidos de ventanas",
+        "Description": "Reproduce sonidos chiptune al abrir, cerrar, minimizar y maximizar ventanas",
+        "Version": "1.0",
+        "License": "GPL-2.0+"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

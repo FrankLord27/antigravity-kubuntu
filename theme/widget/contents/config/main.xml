@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="launchers" type="StringList">
+      <default>applications:systemsettings.desktop,preferred://filemanager,preferred://browser,applications:org.kde.konsole.desktop</default>
+    </entry>
+    <entry name="city" type="String">
+      <default>La Vega</default>
+    </entry>
+    <entry name="latitude" type="Double">
+      <default>19.2221</default>
+    </entry>
+    <entry name="longitude" type="Double">
+      <default>-70.5296</default>
+    </entry>
+  </group>
+</kcfg>
