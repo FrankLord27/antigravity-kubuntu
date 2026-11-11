@@ -6,26 +6,40 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
+# ¿Le falta contrib, non-free o non-free-firmware a alguna línea de Debian?
+# (el instalador de Debian solo pone "main non-free-firmware": faltan contrib y non-free,
+#  y con ellos Steam, Lutris, winetricks…)
+_components_incomplete() { # $1 = archivo, $2 = regex de las líneas a mirar
+    local l
+    while IFS= read -r l; do
+        for c in contrib non-free non-free-firmware; do
+            grep -Eq "(^|[[:space:]])${c}([[:space:]]|\$)" <<<"$l" || return 0
+        done
+    done < <(grep -E "$2" "$1" 2>/dev/null)
+    return 1
+}
+
 _enable_repos_debian() {
     ui_info "Habilitando contrib, non-free y non-free-firmware (Debian)..."
-    local changed=false
+    local changed=false f
     # Formato deb822 (Debian 12+): /etc/apt/sources.list.d/debian.sources
-    if [[ -f /etc/apt/sources.list.d/debian.sources ]]; then
-        if ! grep -q 'non-free-firmware' /etc/apt/sources.list.d/debian.sources; then
+    f=/etc/apt/sources.list.d/debian.sources
+    if [[ -f "$f" ]]; then
+        if _components_incomplete "$f" '^Components:'; then
             run_cmd 2 "Añadir componentes a debian.sources" \
-                sed -i -E 's/^(Components:.*)$/Components: main contrib non-free non-free-firmware/' \
-                /etc/apt/sources.list.d/debian.sources && changed=true
-        else ui_skip "debian.sources ya incluye non-free"; fi
+                sed -i -E 's/^Components:.*$/Components: main contrib non-free non-free-firmware/' "$f" && changed=true
+        else ui_skip "debian.sources ya incluye contrib y non-free"; fi
     fi
     # Formato clásico
-    if [[ -f /etc/apt/sources.list ]] && grep -qE '^deb .*main' /etc/apt/sources.list; then
-        if ! grep -qE '^deb .*non-free-firmware' /etc/apt/sources.list; then
+    f=/etc/apt/sources.list
+    if [[ -f "$f" ]] && grep -qE '^deb(-src)? .* main' "$f"; then
+        if _components_incomplete "$f" '^deb(-src)? .* main'; then
             run_cmd 2 "Añadir componentes a sources.list" \
-                sed -i -E '/^deb(-src)? /{/non-free-firmware/!s/ main( .*)?$/ main contrib non-free non-free-firmware/}' \
-                /etc/apt/sources.list && changed=true
-        else ui_skip "sources.list ya incluye non-free"; fi
+                sed -i -E '/^deb(-src)? /s/ main( .*)?$/ main contrib non-free non-free-firmware/' "$f" && changed=true
+        else ui_skip "sources.list ya incluye contrib y non-free"; fi
     fi
-    $changed && run_cmd 2 "apt update post-repos" apt update
+    if $changed; then run_cmd 2 "apt update post-repos" apt-get update; fi
+    return 0
 }
 
 _enable_repos_ubuntu() {
@@ -62,7 +76,7 @@ run_module_system() {
         }
     done
 
-    is_debian && _enable_repos_debian || _enable_repos_ubuntu
+    if is_debian; then _enable_repos_debian; else _enable_repos_ubuntu; fi
 
     run_cmd 1 "apt update" apt update
     run_cmd 2 "apt full-upgrade" apt full-upgrade -y \

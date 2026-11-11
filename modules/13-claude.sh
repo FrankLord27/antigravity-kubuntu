@@ -73,10 +73,13 @@ run_module_claude() {
         ui_panel_end; return 1
     fi
     if [[ "${errs:-0}" -gt 0 || "${warns:-0}" -gt 0 ]]; then
-        grep -E '\[✗\]|\[!\]' "$log" | sed 's/\x1b\[[0-9;]*m//g' | head -12 | while IFS= read -r l; do
+        grep -E '\[✗\]|\[!\]' "$log" | sed 's/\x1b\[[0-9;]*m//g' | grep -vE 'Instalando uv|kimi|capa privada|Sin credenciales|GITHUB_MCP_TOKEN|gh sin autenticar|gh NO autenticado' | head -12 | while IFS= read -r l; do
             echo -e "      ${C_DIM}${l:0:120}${C_RESET}"; done
     fi
 
+    if grep -q 'No se pudo instalar .*@' "$log" 2>/dev/null; then
+        ui_warn "Algunos plugins de Claude no se instalaron. Tras iniciar sesión (claude y gh auth login): ~/.ai-lordkit/install.sh plugins"
+    fi
     ui_panel_end; ui_ok "Módulo 13 completado"
     ui_info "Abre una terminal nueva y escribe: claude  (inicia sesión una vez)"
 }

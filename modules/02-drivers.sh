@@ -74,7 +74,7 @@ report_unbound_devices() {
         while IFS= read -r l; do echo -e "      ${C_YELLOW}${l:0:110}${C_RESET}"; _log "WARN" "sin driver: $l"; done <<<"$out"
     fi
     # Firmware que el kernel pidió y no encontró en este arranque.
-    local miss; miss=$(dmesg 2>/dev/null | grep -iE 'firmware.*(failed|not found|missing)|Direct firmware load.*failed' | sed 's/^\[[^]]*\] //' | sort -u | head -8 || true)
+    local miss; miss=$(dmesg 2>/dev/null | grep -iE 'firmware.*(failed|not found|missing)|Direct firmware load.*failed' | grep -vE 'iwl-debug-yoyo|regulatory\.db' | sed 's/^\[[^]]*\] //' | sort -u | head -8 || true)
     if [[ -n "$miss" ]]; then
         ui_warn "El kernel pidió firmware que no encontró en ESTE arranque (tras reiniciar debería estar):"
         while IFS= read -r l; do echo -e "      ${C_DIM}${l:0:110}${C_RESET}"; done <<<"$miss"

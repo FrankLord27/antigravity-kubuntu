@@ -31,7 +31,7 @@ _verify_nvidia() {
         fi
     }
 
-    local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "")
+    local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | grep -E '^[0-9.]+$' | head -1 || true)
     if is_ubuntu && [[ -n "$drv_ver" ]]; then
         local drv_major; drv_major=$(echo "$drv_ver" | cut -d. -f1)
         [[ "$drv_major" -ge 580 ]] && [[ "$drv_major" -lt 590 ]] \
@@ -40,15 +40,19 @@ _verify_nvidia() {
                 && ui_warn "Driver 595+ detectado ($drv_ver) — regresiones en Turing, considera degradar a 580" \
                 || ui_warn "Driver $drv_ver — versión antigua, actualiza a 580"; }
     elif [[ -n "$drv_ver" ]]; then
-        ui_ok "Driver NVIDIA $drv_ver (paquete nvidia-driver de Debian)"
+        ui_ok "Driver NVIDIA $drv_ver cargado"
     fi
 
     local mods; mods=$(lsmod 2>/dev/null | grep '^nvidia' | awk '{print $1}' | tr '\n' ' ')
     [[ -n "$mods" ]] && ui_ok "Módulos NVIDIA: $mods" || ui_info "Módulos NVIDIA aún no cargados (normal antes de reiniciar)"
 
-    lsmod 2>/dev/null | grep -q '^nouveau' \
-        && ui_fail "nouveau ACTIVO — conflicto con driver propietario" \
-        || ui_ok "nouveau correctamente desactivado"
+    if ! lsmod 2>/dev/null | grep -q '^nouveau'; then
+        ui_ok "nouveau correctamente desactivado"
+    elif nouveau_blacklisted; then
+        ui_info "nouveau sigue cargado en ESTE arranque; ya está bloqueado y no cargará al reiniciar"
+    else
+        ui_fail "nouveau ACTIVO y sin bloquear — conflicto con el driver NVIDIA"
+    fi
 
     local ds; ds=$(dkms status 2>/dev/null | grep -i nvidia || echo "sin info")
     echo "$ds" | grep -qi 'installed' && ui_ok "DKMS NVIDIA: $ds" || ui_warn "DKMS: $ds"
@@ -77,7 +81,9 @@ _verify_nvidia() {
 
     silent_cmd glxinfo && {
         local r; r=$(glxinfo 2>/dev/null | grep 'OpenGL renderer' | sed 's/.*: //')
-        echo "$r" | grep -qi nvidia && ui_ok "OpenGL NVIDIA: $r" || ui_warn "OpenGL renderer: $r"
+        if echo "$r" | grep -qi nvidia; then ui_ok "OpenGL NVIDIA: $r"
+        elif echo "$r" | grep -qE '^NV[0-9A-F]+'; then ui_info "OpenGL aún con nouveau ($r) — cambia a NVIDIA al reiniciar"
+        else ui_warn "OpenGL renderer: $r"; fi
     } || ui_info "glxinfo no disponible (apt install mesa-utils) — no crítico en Wayland"
 
     silent_cmd vulkaninfo --summary && ui_ok "Vulkan OK" \
@@ -88,7 +94,7 @@ _verify_nvidia() {
     elif [[ -d /usr/local/cuda ]] || is_deb_installed cuda-toolkit-12-8; then
         ui_ok "CUDA toolkit instalado"
     else
-        ui_info "CUDA toolkit no instalado — opcional, instala módulo 2 si usas GPU computing"
+        ui_info "CUDA toolkit no instalado — opcional (solo para cómputo en GPU)"
     fi
 }
 
@@ -196,10 +202,19 @@ _verify_system() {
         [[ "$t" -gt 85 ]] && ui_warn "GPU temperatura alta (${t}°C)"
     }
 
-    local kerr; kerr=$(journalctl -b -k -p err --no-pager 2>/dev/null | grep -vc '^--'); kerr=${kerr:-0}
-    [[ "$kerr" -eq 0 ]] && ui_ok "Sin errores del kernel en este arranque" \
-        || { [[ "$kerr" -le 10 ]] && ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)" \
-        || ui_warn "$kerr error(s) del kernel — journalctl -b -k -p err"; }
+    # Errores del kernel: se muestran los mensajes más repetidos, no solo un número.
+    local kraw kerr
+    kraw=$(journalctl -b -k -p err --no-pager -o cat 2>/dev/null | grep -v '^--' || true)
+    kerr=$(grep -c . <<<"$kraw" || true); kerr=${kerr:-0}
+    if [[ "$kerr" -eq 0 ]]; then ui_ok "Sin errores del kernel en este arranque"
+    elif [[ "$kerr" -le 10 ]]; then ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)"
+    else
+        ui_warn "$kerr error(s) del kernel en este arranque. Los más repetidos:"
+        sed -E 's/[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]//g; s/[0-9]+/N/g' <<<"$kraw" | sort | uniq -c | sort -rn | head -4 \
+            | while IFS= read -r l; do echo -e "      ${C_DIM}${l:0:120}${C_RESET}"; _log "INFO" "kernel: $l"; done
+        lsmod 2>/dev/null | grep -q '^nouveau' && ui_info "Con nouveau cargado es normal ver muchos; vuelve a mirar tras reiniciar"
+    fi
+    return 0
 }
 
 _verify_harmony_final() {

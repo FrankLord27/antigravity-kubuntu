@@ -12,9 +12,11 @@ export C_WHITE='\033[1;37m' C_GRAY='\033[0;90m' C_BOLD='\033[1m'
 export C_DIM='\033[2m' C_RESET='\033[0m'
 export ICON_OK="✓" ICON_FAIL="✗" ICON_WARN="⚠" ICON_INFO="●"
 export ICON_RUN="▶" ICON_SKIP="○" ICON_FATAL="☠"
-export AG_OK_COUNT=0 AG_ERROR_COUNT=0 AG_WARN_COUNT=0 AG_SKIP_COUNT=0
+# Cada módulo vuelve a cargar este archivo: los contadores y el log se conservan
+# para que el resumen final cuente TODA la sesión y haya un solo log.
+export AG_OK_COUNT="${AG_OK_COUNT:-0}" AG_ERROR_COUNT="${AG_ERROR_COUNT:-0}" AG_WARN_COUNT="${AG_WARN_COUNT:-0}" AG_SKIP_COUNT="${AG_SKIP_COUNT:-0}"
 export AG_LOG_DIR="/var/log/auto-setup"
-export AG_LOG_FILE="${AG_LOG_DIR}/$(date '+%Y-%m-%d_%H-%M-%S').log"
+export AG_LOG_FILE="${AG_LOG_FILE:-${AG_LOG_DIR}/$(date '+%Y-%m-%d_%H-%M-%S').log}"
 
 ui_log_init() {
     mkdir -p "$AG_LOG_DIR"
