@@ -94,7 +94,7 @@ _verify_nvidia() {
     elif [[ -d /usr/local/cuda ]] || is_deb_installed cuda-toolkit-12-8; then
         ui_ok "CUDA toolkit instalado"
     else
-        ui_info "CUDA toolkit no instalado — opcional, instala módulo 2 si usas GPU computing"
+        ui_info "CUDA toolkit no instalado — opcional (solo para cómputo en GPU)"
     fi
 }
 
@@ -202,7 +202,19 @@ _verify_system() {
         [[ "$t" -gt 85 ]] && ui_warn "GPU temperatura alta (${t}°C)"
     }
 
-    local kerr; kerr=$(journalctl -b -k -p err --no-pager 2>/dev/null | grep -vc '^--'); kerr=${kerr:-0}
+    # Errores del kernel: se muestran los mensajes más repetidos, no solo un número.
+    local kraw kerr
+    kraw=$(journalctl -b -k -p err --no-pager -o cat 2>/dev/null | grep -v '^--' || true)
+    kerr=$(grep -c . <<<"$kraw" || true); kerr=${kerr:-0}
+    if [[ "$kerr" -eq 0 ]]; then ui_ok "Sin errores del kernel en este arranque"
+    elif [[ "$kerr" -le 10 ]]; then ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)"
+    else
+        ui_warn "$kerr error(s) del kernel en este arranque. Los más repetidos:"
+        sed -E 's/[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]//g; s/[0-9]+/N/g' <<<"$kraw" | sort | uniq -c | sort -rn | head -4 \
+            | while IFS= read -r l; do echo -e "      ${C_DIM}${l:0:120}${C_RESET}"; _log "INFO" "kernel: $l"; done
+        lsmod 2>/dev/null | grep -q '^nouveau' && ui_info "Con nouveau cargado es normal ver muchos; vuelve a mirar tras reiniciar"
+    fi
+}
     [[ "$kerr" -eq 0 ]] && ui_ok "Sin errores del kernel en este arranque" \
         || { [[ "$kerr" -le 10 ]] && ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)" \
         || ui_warn "$kerr error(s) del kernel — journalctl -b -k -p err"; }
