@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# AUTO SETUP — modules/05-gaming.sh [Debian 13 / Ubuntu 26.04]
-# Gaming (OPCIONAL): Steam + Lutris + Wine + Vulkan + MangoHud + GameMode
+# AUTO SETUP — modules/11-gaming.sh [Debian 13 / Ubuntu 26.04]
+# Gaming: Steam + Lutris + Wine + Vulkan + MangoHud + GameMode
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
 run_module_gaming() {
-    ui_step "MÓDULO 05 — GAMING"
+    ui_step "MÓDULO 11 — GAMING"
     ui_panel_start "Steam + Lutris + Vulkan + MangoHud + GameMode"
     export DEBIAN_FRONTEND=noninteractive
     detect_hardware
@@ -26,8 +26,11 @@ run_module_gaming() {
     done
 
     ui_info "Instalando Steam..."
+    # La licencia de Steam se acepta por debconf para que no pregunte.
+    echo 'steam steam/question select I AGREE' | debconf-set-selections 2>/dev/null || true
+    echo 'steam steam/license note ' | debconf-set-selections 2>/dev/null || true
     { is_deb_installed steam-installer || is_deb_installed steam; } && ui_skip "Steam" \
-        || run_cmd 2 "Instalar steam-installer" apt install -y steam-installer
+        || run_cmd 2 "Instalar steam-installer" apt install -y steam-installer steam-devices
 
     ui_info "Instalando Lutris..."
     if ! is_deb_installed lutris; then
@@ -46,7 +49,7 @@ run_module_gaming() {
                 > /etc/apt/sources.list.d/winehq.list"
             run_cmd 1 "apt update post-WineHQ" apt update
         fi
-        for pkg in wine64 wine32 winetricks; do
+        for pkg in wine64 "wine32:i386" winetricks; do
             is_deb_installed "$pkg" && ui_skip "$pkg" \
                 || run_cmd 1 "Instalar $pkg" apt install -y --install-recommends "$pkg"
         done
@@ -58,7 +61,7 @@ run_module_gaming() {
 
     local real_user="${SUDO_USER:-$USER}"
     local mango_dir; mango_dir="$(eval echo "~$real_user")/.config/MangoHud"
-    mkdir -p "$mango_dir"
+    sudo -u "$real_user" mkdir -p "$mango_dir"
     [[ ! -f "${mango_dir}/MangoHud.conf" ]] && cat > "${mango_dir}/MangoHud.conf" << 'EOF'
 # MangoHud — AUTO SETUP
 fps
@@ -77,6 +80,7 @@ background_alpha=0.4
 toggle_hud=Shift_R+F12
 toggle_fps_limit=Shift_L+F1
 EOF
+    chown -R "$real_user":"$real_user" "$mango_dir" 2>/dev/null || true
 
     ui_info "Instalando GameMode..."
     is_deb_installed gamemode && ui_skip "GameMode" \
@@ -99,7 +103,7 @@ EOF
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 1 "Instalar $pkg" apt install -y "$pkg"
     done
 
-    ui_panel_end; ui_ok "Módulo 05 completado"
+    ui_panel_end; ui_ok "Módulo 11 completado"
     echo ""; ui_info "Tips:"
     echo -e "  ${C_DIM}• Steam: activar Proton para todos los juegos${C_RESET}"
     echo -e "  ${C_DIM}• Launch options: gamemoderun %command%${C_RESET}"
@@ -108,7 +112,7 @@ EOF
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/05-gaming.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/11-gaming.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_gaming; ui_summary
 fi

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# AUTO SETUP — modules/10-git.sh [Debian 13 / Ubuntu 26.04]
+# AUTO SETUP — modules/08-git.sh [Debian 13 / Ubuntu 26.04]
 # Git completo: identidad interactiva, aliases, SSH key, configuración global
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 
 _ask_git_identity() {
     local real_user="$1"
@@ -17,25 +18,9 @@ _ask_git_identity() {
     [[ -n "$current_email" ]] && echo -e "  ${C_DIM}Email actual  : $current_email${C_RESET}"
     echo ""
 
-    local git_name git_email
-
-    if ${GUM_AVAILABLE:-false} && command -v gum &>/dev/null; then
-        git_name=$(gum input \
-            --placeholder "${current_name:-Frank Rodriguez}" \
-            --prompt "  ➤ Nombre completo: " \
-            --value "${current_name}" < /dev/tty 2>/dev/tty) || git_name="$current_name"
-        git_email=$(gum input \
-            --placeholder "${current_email:-frank@email.com}" \
-            --prompt "  ➤ Email          : " \
-            --value "${current_email}" < /dev/tty 2>/dev/tty) || git_email="$current_email"
-    else
-        echo -ne "  ${C_CYAN}${C_BOLD}Nombre completo${C_RESET}${C_CYAN} [${current_name:-Frank Rodriguez}]: ${C_RESET}"
-        read -r git_name < /dev/tty
-        [[ -z "$git_name" ]] && git_name="$current_name"
-        echo -ne "  ${C_CYAN}${C_BOLD}Email           ${C_RESET}${C_CYAN} [${current_email:-frank@email.com}]: ${C_RESET}"
-        read -r git_email < /dev/tty
-        [[ -z "$git_email" ]] && git_email="$current_email"
-    fi
+    # Los datos se preguntan una sola vez al inicio (lib/config.sh → configs/local.conf).
+    config_ask
+    local git_name="${GIT_NAME:-$current_name}" git_email="${GIT_EMAIL:-$current_email}"
 
     if [[ -z "$git_name" ]] || [[ -z "$git_email" ]]; then
         ui_warn "Nombre o email vacío — identidad no configurada"
@@ -96,15 +81,7 @@ _setup_ssh_key() {
         return
     fi
 
-    local do_ssh=false
-    if ${GUM_AVAILABLE:-false} && command -v gum &>/dev/null; then
-        gum confirm "  ¿Generar clave SSH ed25519 para GitHub/GitLab?" \
-            --affirmative="Sí, generar" --negative="Omitir" < /dev/tty 2>/dev/null && do_ssh=true
-    else
-        ui_confirm "¿Generar clave SSH ed25519 para GitHub/GitLab?" && do_ssh=true
-    fi
-    $do_ssh || return
-
+    # Sin preguntar: una clave ed25519 nueva no pisa nada (solo se crea si no existe).
     run_cmd 2 "Crear ~/.ssh"          mkdir -p "${real_home}/.ssh"
     chown "$real_user":"$real_user" "${real_home}/.ssh" 2>/dev/null || true
     run_cmd 2 "Permisos ~/.ssh 700"   chmod 700 "${real_home}/.ssh"
@@ -174,7 +151,7 @@ _setup_github_cli_and_signing() {
 }
 
 run_module_git() {
-    ui_step "MÓDULO 10 — GIT SETUP"
+    ui_step "MÓDULO 08 — GIT SETUP"
     ui_panel_start "Identidad + Aliases + SSH key + Firma GitHub"
     local real_user="${SUDO_USER:-$USER}"
 
@@ -186,7 +163,7 @@ run_module_git() {
     _setup_ssh_key       "$real_user"
     _setup_github_cli_and_signing "$real_user"
 
-    ui_panel_end; ui_ok "Módulo 10 completado"
+    ui_panel_end; ui_ok "Módulo 08 completado"
 
     # Resumen final
     local gn; gn=$(sudo -u "$real_user" git config --global user.name  2>/dev/null || echo "—")
@@ -197,7 +174,7 @@ run_module_git() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/10-git.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/08-git.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_git; ui_summary
 fi

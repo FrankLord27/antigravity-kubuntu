@@ -8,15 +8,22 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 
 export GUM_AVAILABLE=true
 export DEBIAN_FRONTEND=noninteractive
 AUTO_MODE=false
 [[ "${1:-}" == "--auto" ]] && AUTO_MODE=true
+export AUTO_MODE
 
 _preflight() {
     [[ $EUID -ne 0 ]] && { echo ""; echo "  ERROR: sudo bash setup.sh"; echo ""; exit 1; }
-    ping -c 1 -W 3 1.1.1.1 &>/dev/null || { echo ""; echo "  ERROR: Sin internet."; echo ""; exit 1; }
+    [[ -z "${SUDO_USER:-}" || "${SUDO_USER}" == "root" ]] && {
+        echo ""; echo "  ERROR: lánzalo desde tu usuario normal con sudo (no desde una sesión de root)."; echo ""; exit 1; }
+    ping -c 1 -W 3 1.1.1.1 &>/dev/null || ping -c 1 -W 3 deb.debian.org &>/dev/null \
+        || { echo ""; echo "  ERROR: Sin internet."; echo ""; exit 1; }
+    # lspci decide si hay GPU NVIDIA: tiene que existir ANTES de detectar hardware.
+    command -v lspci &>/dev/null || { apt-get update -qq; apt-get install -y -qq pciutils; } &>/dev/null || true
     detect_distro
     if [[ "$DETECT_DISTRO" == "otra" ]]; then
         echo "  ADVERTENCIA: Este script está pensado para Debian o Ubuntu."
@@ -39,53 +46,65 @@ _ensure_gum() {
 
 declare -A MODULE_NAME=(
     [0]="Diagnóstico del sistema"
-    [1]="Sistema base (apt + repos + firmware + microcode)"
-    [2]="Driver NVIDIA (solo si hay GPU NVIDIA)"
-    [3]="Docker CE (+ GPU si hay NVIDIA)"
-    [4]="Desarrollo (Node 26 + pnpm + VS Code + Chrome + IA + Orca)"
-    [5]="Gaming (Steam + Lutris + Vulkan + MangoHud) — opcional"
-    [6]="Optimización del sistema (ZRAM, sysctl, servicios) — opcional"
-    [7]="Verificación final del sistema"
-    [8]="ZSH + Powerlevel10k"
-    [10]="Git Setup (identidad + SSH + gh)"
-    [12]="Apps personales (apt + flatpak)"
+    [1]="Sistema base (apt + repos + herramientas)"
+    [2]="Drivers y firmware (Wi-Fi, Bluetooth, red, audio, microcode)"
+    [3]="Driver NVIDIA (solo si hay GPU NVIDIA)"
+    [4]="Escritorio KDE (audio, Bluetooth, códecs, fuentes, firewall)"
+    [5]="Docker CE (+ GPU si hay NVIDIA)"
+    [6]="Desarrollo (Node + pnpm + VS Code + Chrome + IA + Orca)"
+    [7]="ZSH + Powerlevel10k"
+    [8]="Git (identidad + SSH + gh)"
+    [9]="Apps personales (apt + flatpak)"
+    [10]="Ajustes de rendimiento (zram, TRIM, earlyoom)"
+    [11]="Gaming (Steam + Lutris + Vulkan + MangoHud)"
+    [12]="Impresoras y escáner"
+    [13]="Claude Code + ai-lordkit"
+    [90]="Verificación final del sistema"
 )
-MODULE_IDS=(0 1 2 3 4 5 6 7 8 10 12)
+MODULE_IDS=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 90)
 
 declare -A MODULE_FILE=(
     [0]="${SCRIPT_DIR}/modules/00-diagnostics.sh"
     [1]="${SCRIPT_DIR}/modules/01-system.sh"
-    [2]="${SCRIPT_DIR}/modules/02-nvidia.sh"
-    [3]="${SCRIPT_DIR}/modules/03-docker.sh"
-    [4]="${SCRIPT_DIR}/modules/04-dev.sh"
-    [5]="${SCRIPT_DIR}/modules/05-gaming.sh"
-    [6]="${SCRIPT_DIR}/modules/06-system-optimize.sh"
-    [7]="${SCRIPT_DIR}/modules/07-verify.sh"
-    [8]="${SCRIPT_DIR}/modules/08-zsh.sh"
-    [10]="${SCRIPT_DIR}/modules/10-git.sh"
-    [12]="${SCRIPT_DIR}/modules/12-apps.sh"
+    [2]="${SCRIPT_DIR}/modules/02-drivers.sh"
+    [3]="${SCRIPT_DIR}/modules/03-nvidia.sh"
+    [4]="${SCRIPT_DIR}/modules/04-desktop.sh"
+    [5]="${SCRIPT_DIR}/modules/05-docker.sh"
+    [6]="${SCRIPT_DIR}/modules/06-dev.sh"
+    [7]="${SCRIPT_DIR}/modules/07-zsh.sh"
+    [8]="${SCRIPT_DIR}/modules/08-git.sh"
+    [9]="${SCRIPT_DIR}/modules/09-apps.sh"
+    [10]="${SCRIPT_DIR}/modules/10-optimize.sh"
+    [11]="${SCRIPT_DIR}/modules/11-gaming.sh"
+    [12]="${SCRIPT_DIR}/modules/12-printing.sh"
+    [13]="${SCRIPT_DIR}/modules/13-claude.sh"
+    [90]="${SCRIPT_DIR}/modules/90-verify.sh"
 )
 
 declare -A MODULE_FUNC=(
     [0]="run_diagnostics"
     [1]="run_module_system"
-    [2]="run_module_nvidia"
-    [3]="run_module_docker"
-    [4]="run_module_dev"
-    [5]="run_module_gaming"
-    [6]="run_module_optimize"
-    [7]="run_module_verify"
-    [8]="run_module_zsh"
-    [10]="run_module_git"
-    [12]="run_module_apps"
+    [2]="run_module_drivers"
+    [3]="run_module_nvidia"
+    [4]="run_module_desktop"
+    [5]="run_module_docker"
+    [6]="run_module_dev"
+    [7]="run_module_zsh"
+    [8]="run_module_git"
+    [9]="run_module_apps"
+    [10]="run_module_optimize"
+    [11]="run_module_gaming"
+    [12]="run_module_printing"
+    [13]="run_module_claude"
+    [90]="run_module_verify"
 )
 
-# Instalación completa: solo programas. Sin gaming (5) ni ajustes del sistema (6).
-# NVIDIA (2) se añade solo si se detecta GPU NVIDIA.
+# Instalación completa. NVIDIA (3) solo si se detecta GPU NVIDIA. El orden importa:
+# drivers antes del escritorio, zsh antes de git y de Claude (ai-lordkit engancha en .zshrc).
 _full_install_order() {
-    local order=(1)
-    has_nvidia && order+=(2)
-    order+=(3 4 10 8 12 7)
+    local order=(1 2)
+    has_nvidia && order+=(3)
+    order+=(4 5 6 7 8 9 10 11 12 13 90)
     echo "${order[@]}"
 }
 
@@ -94,17 +113,21 @@ _module_status() {
     case "$1" in
         0) echo "diagnóstico" ;;
         1) is_deb_installed build-essential && echo "OK" || echo "pendiente" ;;
-        2) has_nvidia || { echo "no aplica"; return; }
+        2) is_deb_installed firmware-linux && echo "OK" || echo "pendiente" ;;
+        3) has_nvidia || { echo "no aplica"; return; }
            lsmod 2>/dev/null | grep -q '^nvidia ' && echo "OK" || echo "pendiente" ;;
-        3) is_service_active docker && echo "OK" || echo "pendiente" ;;
-        4) [[ -s "${real_home}/.nvm/nvm.sh" ]] && echo "OK" || echo "pendiente" ;;
-        5) { is_deb_installed steam-installer || is_deb_installed steam; } && echo "OK" || echo "pendiente" ;;
-        6) [[ -f /etc/sysctl.d/99-auto-setup.conf ]] && echo "OK" || echo "pendiente" ;;
-        7) echo "verificar" ;;
-        8) [[ -d "${real_home}/.oh-my-zsh" ]] && echo "OK" || echo "pendiente" ;;
-        10) local gn; gn=$(sudo -u "${SUDO_USER:-$USER}" git config --global user.name 2>/dev/null || echo "")
-            [[ -n "$gn" ]] && echo "OK" || echo "pendiente" ;;
-        12) is_deb_installed gimp && echo "OK" || echo "pendiente" ;;
+        4) is_deb_installed plasma-desktop && is_deb_installed libavcodec-extra && echo "OK" || echo "pendiente" ;;
+        5) is_service_active docker && echo "OK" || echo "pendiente" ;;
+        6) [[ -s "${real_home}/.nvm/nvm.sh" ]] && echo "OK" || echo "pendiente" ;;
+        7) [[ -d "${real_home}/.oh-my-zsh" ]] && echo "OK" || echo "pendiente" ;;
+        8) local gn; gn=$(sudo -u "${SUDO_USER:-$USER}" git config --global user.name 2>/dev/null || echo "")
+           [[ -n "$gn" ]] && echo "OK" || echo "pendiente" ;;
+        9) is_deb_installed gimp && echo "OK" || echo "pendiente" ;;
+        10) [[ -f /etc/systemd/zram-generator.conf ]] && echo "OK" || echo "pendiente" ;;
+        11) { is_deb_installed steam-installer || is_deb_installed steam; } && echo "OK" || echo "pendiente" ;;
+        12) is_deb_installed cups && echo "OK" || echo "pendiente" ;;
+        13) [[ -x "${real_home}/.claude/hooks/guard.sh" ]] && echo "OK" || echo "pendiente" ;;
+        90) echo "verificar" ;;
     esac
 }
 
@@ -154,7 +177,7 @@ _tui_gum() {
             options+=("[${i}] ${MODULE_NAME[$i]}  ($(_module_status "$i"))")
         done
         options+=("────────────────────────────────────────────────")
-        options+=("[A] Instalación completa (programas, sin gaming ni optimización)")
+        options+=("[A] Instalación completa (todo, en orden)")
         options+=("[M] Seleccionar módulos (multi-select)")
         options+=("[Q] Salir")
         local selected
@@ -166,7 +189,7 @@ _tui_gum() {
         fi
         local choice; choice=$(echo "$selected" | grep -oP '^\[(\w+)\]' | tr -d '[]')
         case "${choice,,}" in
-            [0-9]|1[02]) _execute_module_flow "$choice" ;;
+            [0-9]|1[0-3]|90) _execute_module_flow "$choice" ;;
             a) _execute_full_install ;;
             m) _tui_multiselect ;;
             q) break ;;
@@ -213,11 +236,11 @@ _tui_numeric() {
             [[ "$st" == "OK" ]] && sc="$C_GREEN" && si="$ICON_OK"
             printf "  ${C_CYAN}[%-2s]${C_RESET}  %-58s ${sc}%s (%s)${C_RESET}\n" "$i" "${MODULE_NAME[$i]}" "$si" "$st"
         done
-        echo ""; echo -e "  ${C_CYAN}[A] ${C_RESET}  Instalación completa (programas, sin gaming ni optimización)"
+        echo ""; echo -e "  ${C_CYAN}[A] ${C_RESET}  Instalación completa (todo, en orden)"
         echo -e "  ${C_CYAN}[Q] ${C_RESET}  Salir"; echo ""
         echo -ne "  ${C_BOLD}Selecciona opción: ${C_RESET}"; read -r choice
         case "${choice,,}" in
-            [0-9]|1[02]) _execute_module_flow "$choice" ;;
+            [0-9]|1[0-3]|90) _execute_module_flow "$choice" ;;
             a) _execute_full_install ;;
             q) echo ""; ui_info "Saliendo..."; break ;;
             *) ui_warn "Opción inválida: '$choice'"; sleep 1 ;;
@@ -227,6 +250,7 @@ _tui_numeric() {
 
 main() {
     _preflight; _ensure_gum; ui_log_init
+    config_ask
 
     ui_banner; ui_info "Detectando hardware y estado del sistema..."
     detect_all; echo ""
@@ -246,7 +270,8 @@ main() {
 
     echo ""; ui_ok "Auto Setup finalizado."
     echo -e "  ${C_DIM}Log: ${AG_LOG_FILE}${C_RESET}"; echo ""
-    $AUTO_MODE && ui_warn "Reinicia el equipo para aplicar todo: sudo reboot"
+    $AUTO_MODE && ui_warn "Lee el resumen de arriba y reinicia: sudo reboot"
+    return 0
 }
 
 main "$@"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AUTO SETUP — modules/03-docker.sh [Debian 13 / Ubuntu 26.04]
+# AUTO SETUP — modules/05-docker.sh [Debian 13 / Ubuntu 26.04]
 # Docker CE oficial (repo de Docker para la distro detectada) + NVIDIA Container Toolkit si hay GPU
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,7 +7,7 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
 run_module_docker() {
-    ui_step "MÓDULO 03 — DOCKER CE"
+    ui_step "MÓDULO 05 — DOCKER CE"
     ui_panel_start "Docker CE oficial (+ NVIDIA Container Toolkit si hay GPU)"
     export DEBIAN_FRONTEND=noninteractive
     local real_user="${SUDO_USER:-$USER}"
@@ -63,7 +63,7 @@ run_module_docker() {
     is_service_active docker && ui_ok "Docker CE activo: $(docker --version 2>/dev/null)" \
         || ui_fail "Docker no activo — journalctl -xe | grep docker"
 
-    ui_panel_end; ui_ok "Módulo 03 completado"
+    ui_panel_end; ui_ok "Módulo 05 completado"
 }
 
 _configure_docker_daemon() {
@@ -88,7 +88,8 @@ _install_nvidia_container_toolkit() {
     if is_deb_installed nvidia-container-toolkit; then
         ui_skip "NVIDIA Container Toolkit ya instalado"
     else
-        if [[ ! -f /etc/apt/sources.list.d/nvidia-container-toolkit.list ]]; then
+        # Con el repo de NVIDIA para Debian ya configurado, el toolkit viene de ahí.
+        if ! apt-cache show nvidia-container-toolkit &>/dev/null && [[ ! -f /etc/apt/sources.list.d/nvidia-container-toolkit.list ]]; then
             run_cmd 2 "GPG key nvidia-container" bash -c \
                 'curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
                 | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg'
@@ -122,7 +123,7 @@ _install_portainer_ce() {
     else
         ui_info "Instalando Portainer CE..."
         run_cmd 2 "Crear volumen portainer_data" docker volume create portainer_data
-        run_cmd 2 "Iniciar contenedor portainer" docker run -d -p 8000:8000 -p 9443:9443 \
+        run_cmd 2 "Iniciar contenedor portainer" docker run -d -p 127.0.0.1:9443:9443 \
             --name portainer --restart=always \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v portainer_data:/data portainer/portainer-ce:latest
@@ -131,7 +132,7 @@ _install_portainer_ce() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/03-docker.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/05-docker.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_docker; ui_summary
 fi

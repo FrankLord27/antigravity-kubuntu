@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  AUTO SETUP — modules/12-apps.sh [Debian 13 / Ubuntu 26.04]
+#  AUTO SETUP — modules/09-apps.sh [Debian 13 / Ubuntu 26.04]
 #  Apps personales: apt + AnyDesk + TeamViewer + flatpak (sin snap)
 #  Lee las listas de configs/packages.conf — comenta ahí lo que no quieras.
 # =============================================================================
@@ -63,7 +63,7 @@ _install_flatpak_apps() {
 }
 
 run_module_apps() {
-    ui_step "MÓDULO 12 — APPS PERSONALES"
+    ui_step "MÓDULO 09 — APPS PERSONALES"
     ui_panel_start "apt + AnyDesk + TeamViewer + flatpak"
     export DEBIAN_FRONTEND=noninteractive
 
@@ -72,11 +72,11 @@ run_module_apps() {
     _install_teamviewer
     _install_flatpak_apps
 
-    ui_panel_end; ui_ok "Módulo 12 completado"
+    ui_panel_end; ui_ok "Módulo 09 completado"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/12-apps.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/09-apps.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_apps; ui_summary
 fi

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  AUTO SETUP — modules/02-nvidia.sh [Debian 13 / Ubuntu 26.04]
+#  AUTO SETUP — modules/03-nvidia.sh [Debian 13 / Ubuntu 26.04]
 #  Solo se ejecuta si se detecta GPU NVIDIA. En equipos sin NVIDIA se omite.
 #
-#  DEBIAN: usa el paquete "nvidia-driver" del repo non-free (gestionado por
-#          Debian, sin ramas ni PPAs) + suspensión + Wayland.
+#  DEBIAN: por defecto el repo apt oficial de NVIDIA fijado en una rama
+#          (NVIDIA_SOURCE/NVIDIA_BRANCH/NVIDIA_FLAVOR en packages.conf). Con
+#          NVIDIA_SOURCE=debian usa el paquete nvidia-driver 550 de Debian.
 #  UBUNTU (GTX 1660 SUPER, Turing/TU116) — DECISIONES:
 #  • Rama 580 — producción estable, NO 595 (regresiones Turing persisten en 595.84)
 #  • Variante configurable en packages.conf (2026-07-02: proprietary + GSP off)
@@ -30,7 +31,7 @@ readonly NVIDIA_MIN_VERSION=578
 readonly CUDA_VERSION="12-8"
 
 run_module_nvidia() {
-    ui_step "MÓDULO 02 — DRIVER NVIDIA"
+    ui_step "MÓDULO 03 — DRIVER NVIDIA"
     export DEBIAN_FRONTEND=noninteractive
     detect_hardware
     if ! has_nvidia; then
@@ -42,18 +43,27 @@ run_module_nvidia() {
     _show_current_state
 
     if is_debian; then
-        ui_panel_start "Debian: nvidia-driver (non-free) + Wayland + suspensión"
+        ui_panel_start "Debian: driver NVIDIA (${NVIDIA_SOURCE:-nvidia-repo} ${NVIDIA_BRANCH:-}) + Wayland"
+        _clean_old_env_vars
+        _check_secure_boot
         if [[ "$DETECT_NVIDIA_MODULE" == "loaded" ]] && is_deb_installed nvidia-driver; then
             ui_skip "nvidia-driver ya instalado y funcionando"
         else
             _check_run_installer
-            _install_nvidia_debian
+            if [[ "${NVIDIA_SOURCE:-nvidia-repo}" == "debian" ]]; then _install_nvidia_debian
+            else _install_nvidia_repo; fi
         fi
-        _configure_wayland_nvidia
-        _configure_suspend_services
-        _configure_vram_preservation
+        _configure_gsp
+        _configure_drm_modeset
+        if [[ "${NVIDIA_SOURCE:-nvidia-repo}" == "debian" ]]; then
+            # El paquete de Debian no trae estas opciones activadas; el del repo de NVIDIA sí.
+            _configure_suspend_services
+            _configure_vram_preservation
+        fi
+        is_deb_installed nvtop || run_cmd 1 "Instalar nvtop" apt-get install -y nvtop
         run_cmd 2 "update-initramfs" update-initramfs -u -k all
-        ui_panel_end; ui_ok "Módulo 02 completado"
+        _verify_dkms_post_install
+        ui_panel_end; ui_ok "Módulo 03 completado"
         ui_warn "REINICIO REQUERIDO"
         return 0
     fi
@@ -85,8 +95,8 @@ run_module_nvidia() {
     run_cmd 2 "update-initramfs" update-initramfs -u -k all
     _verify_dkms_post_install
 
-    ui_panel_end; ui_ok "Módulo 02 completado"
-    ui_warn "REINICIO REQUERIDO — ejecuta 07-verify.sh tras reiniciar"
+    ui_panel_end; ui_ok "Módulo 03 completado"
+    ui_warn "REINICIO REQUERIDO — ejecuta 90-verify.sh tras reiniciar"
 }
 
 _show_current_state() {
@@ -150,6 +160,78 @@ EOF'
     ui_ok "nouveau en blacklist"
 }
 
+# Variables que una versión anterior metía en /etc/environment. Rompen la sesión X11 de
+# respaldo y el login de SDDM (QT_QPA_PLATFORM=wayland) y hacen fallar juegos
+# (SDL_VIDEODRIVER=wayland). Los drivers actuales no las necesitan.
+_clean_old_env_vars() {
+    local ef=/etc/environment v removed=false
+    [[ -f "$ef" ]] || return 0
+    for v in NVD_BACKEND GBM_BACKEND __GLX_VENDOR_LIBRARY_NAME LIBVA_DRIVER_NAME __GL_GSYNC_ALLOWED \
+             __GL_VRR_ALLOWED WLR_NO_HARDWARE_CURSORS ELECTRON_OZONE_PLATFORM_HINT QT_QPA_PLATFORM SDL_VIDEODRIVER; do
+        grep -q "^${v}=" "$ef" && { sed -i "/^${v}=/d" "$ef"; removed=true; }
+    done
+    $removed && ui_ok "Quitadas variables NVIDIA/Wayland antiguas de /etc/environment" || true
+}
+
+# Con Secure Boot activo el módulo compilado por DKMS no carga si su llave no está inscrita.
+_check_secure_boot() {
+    [[ "$DETECT_SECURE_BOOT" == "enabled" ]] || return 0
+    ui_warn "SECURE BOOT ESTÁ ACTIVO: el driver NVIDIA no cargará hasta que hagas UNA de estas dos cosas:"
+    ui_warn "  a) Desactivar Secure Boot en la BIOS (lo más simple), o"
+    ui_warn "  b) Inscribir la llave de DKMS:  sudo mokutil --import /var/lib/dkms/mok.pub"
+    ui_warn "     (pide una contraseña; al reiniciar eliges 'Enroll MOK' y la escribes)"
+}
+
+# Repo apt oficial de NVIDIA para Debian, fijado en una rama (packages.conf).
+_install_nvidia_repo() {
+    local branch="${NVIDIA_BRANCH:-610}" flavor="${NVIDIA_FLAVOR:-proprietary}"
+    local distro="debian${DETECT_OS_VER%%.*}"
+    local base="https://developer.download.nvidia.com/compute/cuda/repos/${distro}/x86_64"
+    ui_info "Instalando driver NVIDIA ${branch} (${flavor}) desde el repo oficial de NVIDIA (${distro})..."
+    ui_warn "Puede tardar varios minutos — DKMS compilará el módulo. NO interrumpas."
+
+    if ! dpkg --print-foreign-architectures 2>/dev/null | grep -q i386; then
+        run_cmd 2 "Habilitar i386" dpkg --add-architecture i386
+    else ui_skip "i386 ya habilitado"; fi
+
+    if ! is_deb_installed cuda-keyring; then
+        local tmp; tmp=$(mktemp -d)
+        run_cmd 3 "Descargar la llave del repo de NVIDIA" curl -fsSL -o "${tmp}/cuda-keyring.deb" "${base}/cuda-keyring_1.1-1_all.deb"
+        run_cmd 3 "Instalar la llave del repo de NVIDIA" dpkg -i "${tmp}/cuda-keyring.deb"
+        rm -rf "$tmp"
+    else ui_skip "Repo de NVIDIA ya configurado"; fi
+    run_cmd 3 "apt update (repo NVIDIA)" apt-get update
+
+    # El paquete de fijación hace que apt no salte a otra rama al actualizar.
+    local pin="nvidia-driver-pinning-${branch}"
+    is_deb_installed "$pin" && ui_skip "$pin" || {
+        run_cmd 3 "Fijar la rama ${branch}" apt-get install -y "$pin"
+        run_cmd 2 "apt update (rama fijada)" apt-get update
+    }
+
+    for pkg in linux-headers-amd64 dkms; do
+        is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 3 "Instalar $pkg" apt-get install -y "$pkg"
+    done
+
+    # cuda-drivers = módulo propietario; nvidia-open = módulos open (obligan a usar GSP).
+    local meta="cuda-drivers"; [[ "$flavor" == "open" ]] && meta="nvidia-open"
+    run_cmd 3 "Instalar ${meta} (rama ${branch})" apt-get install -y "$meta"
+    # Librerías de 32 bits: las usan Steam y Wine.
+    run_cmd 1 "Instalar librerías NVIDIA de 32 bits" apt-get install -y "nvidia-driver-libs:i386"
+    ui_ok "Driver NVIDIA ${branch} (${flavor}) instalado"
+}
+
+_configure_drm_modeset() {
+    local drmf="/etc/modprobe.d/nvidia-drm.conf"
+    if [[ ! -f "$drmf" ]] || ! grep -q 'modeset=1' "$drmf" 2>/dev/null; then
+        run_cmd 2 "Configurar nvidia-drm (modeset + fbdev, necesarios para Wayland)" bash -c 'cat > /etc/modprobe.d/nvidia-drm.conf << EOF
+# AUTO SETUP — NVIDIA DRM para Wayland (y consola a resolución nativa)
+options nvidia-drm modeset=1
+options nvidia-drm fbdev=1
+EOF'
+    else ui_skip "nvidia-drm modeset ya configurado"; fi
+}
+
 _install_nvidia_debian() {
     ui_info "Instalando nvidia-driver desde el repo non-free de Debian..."
     ui_warn "Puede tardar varios minutos — DKMS compilará el módulo. NO interrumpas."
@@ -194,7 +276,7 @@ _install_nvidia_580() {
 
 _configure_gsp() {
     local gf="/etc/modprobe.d/nvidia-gsp.conf"
-    if [[ "${NVIDIA_DRIVER_VARIANT:-open}" == "proprietary" ]] && [[ "${NVIDIA_DISABLE_GSP:-false}" == "true" ]]; then
+    if [[ "${NVIDIA_FLAVOR:-${NVIDIA_DRIVER_VARIANT:-open}}" == "proprietary" ]] && [[ "${NVIDIA_DISABLE_GSP:-false}" == "true" ]]; then
         if grep -q 'NVreg_EnableGpuFirmware=0' "$gf" 2>/dev/null; then
             ui_skip "GSP ya desactivado"
         else
@@ -283,24 +365,7 @@ nvidia_uvm
 nvidia_drm
 EOF'
 
-    # Variables de entorno para KDE Plasma 6 + Wayland + NVIDIA
-    local ef="/etc/environment"
-    declare -A envs=(
-        ["NVD_BACKEND"]="direct"
-        ["GBM_BACKEND"]="nvidia-drm"
-        ["__GLX_VENDOR_LIBRARY_NAME"]="nvidia"
-        ["LIBVA_DRIVER_NAME"]="nvidia"
-        ["__GL_GSYNC_ALLOWED"]="1"
-        ["__GL_VRR_ALLOWED"]="1"
-        ["WLR_NO_HARDWARE_CURSORS"]="0"
-        ["ELECTRON_OZONE_PLATFORM_HINT"]="wayland"
-        ["QT_QPA_PLATFORM"]="wayland"
-        ["SDL_VIDEODRIVER"]="wayland"
-    )
-    for key in "${!envs[@]}"; do
-        grep -q "^${key}=" "$ef" 2>/dev/null && ui_skip "Variable $key" \
-            || run_cmd 1 "Agregar $key" bash -c "echo '${key}=${envs[$key]}' >> $ef"
-    done
+    _clean_old_env_vars
     ui_ok "Entorno Wayland + NVIDIA configurado"
 }
 
@@ -354,7 +419,7 @@ _verify_dkms_post_install() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/02-nvidia.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/03-nvidia.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_nvidia; ui_summary
 fi

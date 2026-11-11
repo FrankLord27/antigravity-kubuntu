@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AUTO SETUP — modules/04-dev.sh [Debian 13 / Ubuntu 26.04]
+# AUTO SETUP — modules/06-dev.sh [Debian 13 / Ubuntu 26.04]
 # Stack de desarrollo: nvm + Node 26 + pnpm (corepack) + VS Code + Chrome
 #                      + Claude Code + Codex CLI + Gemini CLI + Orca
 
@@ -32,22 +32,22 @@ _install_node() {
             "nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION}"
     fi
 
-    if _as_user_node "$real_user" "$real_home" "command -v pnpm &>/dev/null"; then
+    if _as_user_node "$real_user" "$real_home" "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm -v &>/dev/null"; then
         ui_skip "pnpm ya instalado"
     else
         run_cmd 2 "Instalar corepack + pnpm" _as_user_node "$real_user" "$real_home" \
-            "npm install -g corepack && corepack enable pnpm"
+            "export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; npm install -g corepack && corepack enable pnpm && { corepack install -g pnpm@latest || corepack prepare pnpm@latest --activate; }"
     fi
 
     local nv pv
     nv=$(_as_user_node "$real_user" "$real_home" "node -v" 2>/dev/null || echo "?")
-    pv=$(_as_user_node "$real_user" "$real_home" "pnpm -v" 2>/dev/null || echo "?")
+    pv=$(_as_user_node "$real_user" "$real_home" "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm -v" 2>/dev/null || echo "?")
     ui_ok "Node ${nv} · pnpm ${pv}"
 }
 
 _install_ai_clis() {
     local real_user="$1" real_home="$2"
-    ui_info "Instalando agentes de IA (Claude Code, Codex, Gemini)..."
+    ui_info "Instalando agentes de IA por npm (Codex, Gemini; Claude Code va en el módulo 13)..."
     for pkg in "${NPM_GLOBAL_PKGS[@]}"; do
         if _as_user_node "$real_user" "$real_home" "npm ls -g --depth=0 2>/dev/null | grep -q '${pkg}@'"; then
             ui_skip "$pkg"
@@ -77,13 +77,20 @@ _install_vscode() {
     ui_info "Instalando VS Code..."
     run_cmd 2 "GPG key Microsoft" bash -c \
         'curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-        | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg'
-    run_cmd 2 "Repo VS Code" bash -c \
-        'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] \
-        https://packages.microsoft.com/repos/code stable main" \
-        > /etc/apt/sources.list.d/vscode.list'
-    run_cmd 2 "apt update post-vscode" apt update
-    run_cmd 2 "Instalar code" apt install -y code
+        | gpg --dearmor --yes -o /usr/share/keyrings/microsoft.gpg'
+    # Mismo archivo que crea el propio paquete `code`: así apt no ve el repo duplicado.
+    rm -f /etc/apt/sources.list.d/vscode.list
+    run_cmd 2 "Repo VS Code" bash -c 'cat > /etc/apt/sources.list.d/vscode.sources << EOF
+Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/microsoft.gpg
+EOF'
+    echo "code code/add-microsoft-repo boolean true" | debconf-set-selections 2>/dev/null || true
+    run_cmd 2 "apt update post-vscode" apt-get update
+    run_cmd 2 "Instalar code" apt-get install -y code
 }
 
 _install_chrome() {
@@ -91,22 +98,17 @@ _install_chrome() {
     { is_cmd_available google-chrome || is_cmd_available google-chrome-stable; } \
         && { ui_skip "Google Chrome ya instalado"; return 0; }
     ui_info "Instalando Google Chrome..."
-    if [[ ! -f /etc/apt/keyrings/google-chrome.gpg ]]; then
-        install -m 0755 -d /etc/apt/keyrings
-        run_cmd 2 "GPG key Google" bash -c \
-            'curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-            | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg'
-        run_cmd 2 "Repo Google Chrome" bash -c \
-            'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] \
-            https://dl.google.com/linux/chrome/deb/ stable main" \
-            > /etc/apt/sources.list.d/google-chrome.list'
-        run_cmd 2 "apt update post-chrome" apt update
-    fi
-    run_cmd 2 "Instalar google-chrome-stable" apt install -y google-chrome-stable
+    # El .deb oficial configura él mismo su repo y su llave para las actualizaciones.
+    rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/keyrings/google-chrome.gpg
+    local tmp; tmp=$(mktemp -d)
+    run_cmd 2 "Descargar Google Chrome" curl -fsSL -o "${tmp}/chrome.deb" \
+        "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" \
+        && run_cmd 2 "Instalar google-chrome-stable" apt-get install -y "${tmp}/chrome.deb"
+    rm -rf "$tmp"
 }
 
 run_module_dev() {
-    ui_step "MÓDULO 04 — STACK DE DESARROLLO"
+    ui_step "MÓDULO 06 — STACK DE DESARROLLO"
     ui_panel_start "Node + pnpm + VS Code + Chrome + agentes IA + Orca"
     export DEBIAN_FRONTEND=noninteractive
     local real_user="${SUDO_USER:-$USER}"
@@ -114,7 +116,8 @@ run_module_dev() {
 
     ui_info "Instalando herramientas de compilación..."
     for pkg in build-essential gcc g++ make cmake libssl-dev libffi-dev zlib1g-dev \
-                libreadline-dev libsqlite3-dev libbz2-dev jq ripgrep fd-find bat eza fzf zsh httpie; do
+                libreadline-dev libsqlite3-dev libbz2-dev pkg-config jq ripgrep fd-find bat eza fzf zsh httpie \
+                shellcheck git-lfs postgresql-client redis-tools sqlite3; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 1 "Instalar $pkg" apt install -y "$pkg"
     done
 
@@ -132,19 +135,14 @@ run_module_dev() {
         || run_cmd 1 "Agregar Flathub" flatpak remote-add --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
 
-    ui_panel_end; ui_ok "Módulo 04 completado"
+    ui_panel_end; ui_ok "Módulo 06 completado"
     echo ""
-    echo -e "${C_BOLD}  ┌─ LOGIN DE AGENTES (una sola vez, en tu terminal) ─────────┐${C_RESET}"
-    echo -e "  │  ${C_CYAN}claude${C_RESET}        → inicia sesión con tu cuenta Anthropic      │"
-    echo -e "  │  ${C_CYAN}codex login${C_RESET}   → inicia sesión con tu cuenta OpenAI         │"
-    echo -e "  │  ${C_CYAN}gemini${C_RESET}        → inicia sesión con tu cuenta Google         │"
-    echo -e "  │  ${C_CYAN}orca${C_RESET}          → abre el panel y detecta los 3 agentes      │"
-    echo -e "  └────────────────────────────────────────────────────────────┘"
+    ui_info "Login de agentes (una vez, en tu terminal): codex login · gemini"
     echo ""
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/04-dev.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/06-dev.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_dev; ui_summary
 fi

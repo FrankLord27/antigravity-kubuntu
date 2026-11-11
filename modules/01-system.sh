@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AUTO SETUP — modules/01-system.sh [Debian 13 / Ubuntu 26.04]
-# Sistema base: apt, repos (contrib/non-free o universe/multiverse), firmware, microcode
+# Sistema base: apt, repos (contrib/non-free o universe/multiverse), herramientas, sudo
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
@@ -37,19 +37,21 @@ _enable_repos_ubuntu() {
 
 run_module_system() {
     ui_step "MÓDULO 01 — SISTEMA BASE"
-    ui_panel_start "apt + repos + firmware + microcode"
+    ui_panel_start "apt + repos + herramientas base"
     export DEBIAN_FRONTEND=noninteractive
     detect_hardware
 
-    ui_info "Configurando apt..."
-    if [[ ! -f /etc/apt/apt.conf.d/99-auto-setup ]]; then
-        run_cmd 1 "Configurar apt.conf" bash -c 'cat > /etc/apt/apt.conf.d/99-auto-setup << EOF
-Acquire::http::Pipeline-Depth "10";
-Acquire::https::Pipeline-Depth "10";
-APT::Install-Recommends "false";
-APT::Get::AutomaticRemove "true";
-EOF'
-    else ui_skip "apt.conf ya configurado"; fi
+    # Una versión anterior de este script desactivaba los paquetes recomendados de apt.
+    # En Debian eso deja los programas a medias (sin plugins, sin códecs, sin extras).
+    if [[ -f /etc/apt/apt.conf.d/99-auto-setup ]]; then
+        rm -f /etc/apt/apt.conf.d/99-auto-setup
+        ui_ok "Quitado apt.conf antiguo (Install-Recommends vuelve a su valor normal)"
+    fi
+
+    # El instalador deja una línea `deb cdrom:` que rompe `apt update`.
+    if grep -Eq '^\s*deb cdrom:' /etc/apt/sources.list 2>/dev/null; then
+        run_cmd 1 "Quitar la fuente cdrom de apt" sed -i -E 's/^\s*deb cdrom:/# deb cdrom:/' /etc/apt/sources.list
+    fi
 
     # Deshabilitar PPAs rotos antes de actualizar (solo Ubuntu)
     for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
@@ -69,44 +71,28 @@ EOF'
 
     ui_info "Instalando herramientas base..."
     local base_pkgs=(
-        curl wget git htop btop nano vim bash-completion unzip tar xz-utils
-        p7zip-full pciutils usbutils lshw hwinfo inxi fastfetch
-        build-essential dkms lm-sensors fwupd
-        apt-transport-https ca-certificates gnupg
-        python3 python3-pip
+        sudo curl wget git htop btop nano vim bash-completion unzip zip tar xz-utils
+        7zip pciutils usbutils lshw inxi fastfetch lsb-release
+        build-essential dkms jq tree ncdu rsync
+        ca-certificates gnupg
+        python3 python3-pip python3-venv
+        man-db command-not-found
     )
     is_ubuntu && base_pkgs+=(software-properties-common mokutil)
     for pkg in "${base_pkgs[@]}"; do
         is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
     done
 
-    # Headers del kernel (nombre distinto en cada distro)
-    local kh
-    is_debian && kh="linux-headers-amd64" || kh="linux-headers-generic"
-    is_deb_installed "$kh" && ui_skip "$kh" || run_cmd 2 "Instalar $kh" apt install -y "$kh"
+    # El usuario tiene que poder usar sudo después de reiniciar.
+    local ru="${SUDO_USER:-$USER}"
+    id -nG "$ru" 2>/dev/null | grep -qw sudo && ui_skip "$ru ya está en el grupo sudo" \
+        || run_cmd 1 "Agregar $ru al grupo sudo" usermod -aG sudo "$ru"
 
-    # Microcode CPU
-    if grep -qi 'GenuineIntel' /proc/cpuinfo; then
-        is_deb_installed intel-microcode && ui_skip "intel-microcode" \
-            || run_cmd 2 "Instalar intel-microcode" apt install -y intel-microcode
-    elif grep -qi 'AuthenticAMD' /proc/cpuinfo; then
-        is_deb_installed amd64-microcode && ui_skip "amd64-microcode" \
-            || run_cmd 2 "Instalar amd64-microcode" apt install -y amd64-microcode
-    fi
-
-    # Firmware (Wi-Fi Intel, Bluetooth, GPU) — distinto en cada distro
-    local fw_pkgs=()
-    is_debian && fw_pkgs=(firmware-linux firmware-iwlwifi firmware-misc-nonfree) || fw_pkgs=(linux-firmware)
-    for pkg in "${fw_pkgs[@]}"; do
-        is_deb_installed "$pkg" && ui_skip "$pkg" || run_cmd 2 "Instalar $pkg" apt install -y "$pkg"
-    done
-
-    run_cmd 1 "fwupd refresh" fwupdmgr refresh --force
-    run_cmd 1 "fwupd update" fwupdmgr update -y
-
-    if has_nvidia && [[ "$DETECT_SECURE_BOOT" == "enabled" ]]; then
-        ui_warn "SECURE BOOT ACTIVO — desactívalo en BIOS antes de instalar NVIDIA"
-    fi
+    # Parches de seguridad automáticos (solo seguridad, sin reinicios).
+    is_deb_installed unattended-upgrades && ui_skip "unattended-upgrades" \
+        || run_cmd 1 "Instalar unattended-upgrades" apt-get install -y unattended-upgrades
+    [[ -f /etc/apt/apt.conf.d/20auto-upgrades ]] || run_cmd 1 "Activar parches de seguridad automáticos" bash -c \
+        'printf "APT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\n" > /etc/apt/apt.conf.d/20auto-upgrades'
 
     run_cmd 1 "autoremove" apt autoremove -y
     run_cmd 1 "autoclean"  apt autoclean

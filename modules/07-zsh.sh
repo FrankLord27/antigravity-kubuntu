@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  AUTO SETUP — modules/08-zsh.sh [Debian 13 / Ubuntu 26.04]
+#  AUTO SETUP — modules/07-zsh.sh [Debian 13 / Ubuntu 26.04]
 #  ZSH + Oh My Zsh + Powerlevel10k + MesloLGS NF
 #
 #  ORDEN:
@@ -19,7 +19,7 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
 
 run_module_zsh() {
-    ui_step "MÓDULO 08 — ZSH + POWERLEVEL10K"
+    ui_step "MÓDULO 07 — ZSH + POWERLEVEL10K"
     ui_panel_start "ZSH completo"
     export DEBIAN_FRONTEND=noninteractive
     local real_user="${SUDO_USER:-$USER}"
@@ -34,7 +34,7 @@ run_module_zsh() {
     _write_zshrc "$real_user" "$real_home"
     _configure_konsole "$real_user" "$real_home"
 
-    ui_panel_end; ui_ok "Módulo 08 completado"
+    ui_panel_end; ui_ok "Módulo 07 completado"
     _show_post_instructions "$real_user"
 }
 
@@ -157,6 +157,7 @@ setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE SHARE_HISTORY
 export NVM_DIR="\$HOME/.nvm"
 [ -s "\$NVM_DIR/nvm.sh" ] && \\. "\$NVM_DIR/nvm.sh"
 [ -s "\$NVM_DIR/bash_completion" ] && \\. "\$NVM_DIR/bash_completion"
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0   # que pnpm (corepack) no pregunte al bajarse
 ${cuda_block}
 
 # Herramientas modernas
@@ -165,7 +166,13 @@ command -v eza &>/dev/null && {
   alias ll='eza -la --icons --group-directories-first'
   alias lt='eza --tree --icons --level=2'
 }
-command -v bat &>/dev/null && alias cat='bat --style=plain'
+# En Debian `bat` se llama batcat y `fd` se llama fdfind.
+if command -v bat &>/dev/null; then alias cat='bat --style=plain --paging=never'
+elif command -v batcat &>/dev/null; then alias bat='batcat'; alias cat='batcat --style=plain --paging=never'; fi
+command -v fdfind &>/dev/null && ! command -v fd &>/dev/null && alias fd='fdfind'
+
+# Programas instalados en tu carpeta (claude, uv…)
+export PATH="\$HOME/.local/bin:\$PATH"
 
 # Aliases generales
 alias cls='clear'
@@ -199,7 +206,7 @@ ${gpu_alias}
 # Auto Setup
 alias ag-setup='sudo bash \$HOME/antigravity-kubuntu/setup.sh'
 alias ag-diag='sudo bash \$HOME/antigravity-kubuntu/modules/00-diagnostics.sh'
-alias ag-verify='sudo bash \$HOME/antigravity-kubuntu/modules/07-verify.sh'
+alias ag-verify='sudo bash \$HOME/antigravity-kubuntu/modules/90-verify.sh'
 
 # Autocompletado
 autoload -Uz compinit && compinit
@@ -213,6 +220,12 @@ bindkey '^ ' autosuggest-accept
 
 # Powerlevel10k
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+
+# Claude Code (ai-lordkit): habilita claude --modo X y claude --kimi
+[ -f "\$HOME/.claude/shell-init.sh" ] && . "\$HOME/.claude/shell-init.sh"
+
+# TUS ajustes van en ~/.zshrc.local: este archivo se regenera, ese nunca se toca.
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 ZSHRC
     chown "${real_user}:${real_user}" "${home}/.zshrc"
     ui_ok ".zshrc completo escrito"
@@ -331,7 +344,7 @@ _show_post_instructions() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/08-zsh.sh" && exit 1
+    [[ $EUID -ne 0 ]] && echo "Ejecuta: sudo bash modules/07-zsh.sh" && exit 1
     export DEBIAN_FRONTEND=noninteractive
     ui_log_init; run_module_zsh; ui_summary
 fi

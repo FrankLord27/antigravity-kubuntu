@@ -5,12 +5,14 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/detect.sh"
+source "${SCRIPT_DIR}/modules/02-drivers.sh"
 
 run_diagnostics() {
     ui_step "DIAGNÓSTICO DEL SISTEMA"
     ui_info "Analizando sistema..."; echo ""
     detect_all; detect_harmony
     _show_hardware; _show_component_status
+    report_unbound_devices
     _show_log_analysis; _show_harmony_report; _show_health_score
 }
 
