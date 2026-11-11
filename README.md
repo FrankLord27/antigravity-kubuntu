@@ -38,7 +38,7 @@ escritorio KDE, NVIDIA, Docker, stack de desarrollo, apps y Claude Code con
 | 11 | Gaming | Steam, Lutris, Wine, MangoHud, GameMode |
 | 12 | Impresión | CUPS, drivers, escaneo |
 | 13 | Claude | Claude Code + ai-lordkit |
-| 14 | Tema Arcade Tokyo | Escritorio retro de 8 bits: fondo animado, dock con zoom, HUD de CPU/GPU/RAM, iconos y cursor pixel art, sonidos chiptune y pantalla de arranque. Ver [theme/README.md](theme/README.md) |
+| 14 | Tema Arcade Tokyo | Escritorio retro de 8 bits: fondo animado, dock con zoom, HUD de CPU/RAM/red, iconos y cursor pixel art, sonidos chiptune y pantalla de arranque. Ver [theme/README.md](theme/README.md) |
 | 90 | Verificación | Revisa todo y dice qué falta |
 
 Las listas de programas y las versiones están en `configs/packages.conf`; las opciones del tema, en `configs/theme.conf`.

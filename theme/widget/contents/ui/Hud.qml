@@ -6,7 +6,7 @@ import "pal.js" as Pal
 // Se dibuja a 1x y se amplía x2 sin suavizado para que todo quede pixelado.
 Item {
     id: hud
-    readonly property real zoom: 1.6
+    readonly property real zoom: 1.28
     property string city: "La Vega"
     property real latitude: 19.2221
     property real longitude: -70.5296
@@ -15,9 +15,8 @@ Item {
 
     Sensors.Sensor { id: sCpu; sensorId: "cpu/all/usage"; updateRateLimit: 1000 }
     Sensors.Sensor { id: sCpuT; sensorId: "cpu/all/averageTemperature"; updateRateLimit: 2000 }
-    Sensors.Sensor { id: sGpu; sensorId: "gpu/gpu0/usage"; updateRateLimit: 1000 }
-    Sensors.Sensor { id: sGpuT; sensorId: "gpu/gpu0/temperature"; updateRateLimit: 2000 }
-    Sensors.Sensor { id: sVram; sensorId: "gpu/gpu0/usedVram"; updateRateLimit: 2000 }
+    Sensors.Sensor { id: sDown; sensorId: "network/all/download"; updateRateLimit: 1000 }
+    Sensors.Sensor { id: sUp; sensorId: "network/all/upload"; updateRateLimit: 1000 }
     Sensors.Sensor { id: sRam; sensorId: "memory/physical/usedPercent"; updateRateLimit: 2000 }
     Sensors.Sensor { id: sRamU; sensorId: "memory/physical/used"; updateRateLimit: 2000 }
 
@@ -61,10 +60,10 @@ Item {
                 sub: sCpuT.value !== undefined ? Math.round(Pal.num(sCpuT.value)) + "°C" : ""
             }
             Sep {}
-            Meter {
-                label: "GPU"; accent: Pal.purple
-                value: Pal.num(sGpu.value)
-                sub: (sGpuT.value !== undefined ? Math.round(Pal.num(sGpuT.value)) + "°C " : "") + (sVram.formattedValue || "")
+            NetMeter {
+                label: "RED"; accent: Pal.purple
+                down: Pal.num(sDown.value)
+                up: Pal.num(sUp.value)
             }
             Sep {}
             Meter {

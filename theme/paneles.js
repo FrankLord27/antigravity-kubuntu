@@ -98,7 +98,7 @@ for (var s in screens) {
 
 if (!hudExists && first !== null) {
     // aplicar.sh lo coloca a la derecha con el id y el ancho que se imprimen aquí
-    var hud = screens[first].addWidget(DECK, 0, 0, 960, 240);
+    var hud = screens[first].addWidget(DECK, 0, 0, 758, 192);
     cfg(hud, ["General"], {city: CITY, latitude: LAT, longitude: LON});
     print("HUD=" + hud.id + " ANCHO=" + screenGeometry(first).width + "\n");
 }

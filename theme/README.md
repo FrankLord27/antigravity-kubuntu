@@ -9,7 +9,7 @@ Escritorio KDE Plasma 6 con estética retro de 8 bits y colores Tokyo Night.
 | Fondo animado | Batalla espacial en perspectiva (video de 30 s en bucle, generado con `gen/video.py`) |
 | Barra superior | Paginador, menú global del programa activo, reloj en fuente pixel y bandeja del sistema |
 | Dock | Widget propio: iconos con zoom, nave que sigue al ratón y dispara al hacer clic, menú contextual por programa. Cada pantalla muestra solo sus ventanas |
-| HUD de escritorio | El mismo widget puesto sobre el escritorio: CPU, GPU, RAM, visualizador de audio, clima y reloj |
+| HUD de escritorio | El mismo widget puesto sobre el escritorio: CPU, RAM, red, visualizador de audio, clima y reloj |
 | Apariencia | Esquema de colores, iconos Pixelitos ampliados sin suavizado, cursor pixel art, marcos de doble línea neón y botones de ventana propios |
 | Sonidos | 35 sonidos chiptune sintetizados: ventanas, notificaciones y eventos del sistema |
 | Terminal | Colores, fuente pixel con símbolos Nerd Font, sin barras de botones y cartel con el estado del equipo |
@@ -59,7 +59,7 @@ El clima sale de [open-meteo.com](https://open-meteo.com), sin cuenta ni clave.
 
 - Probado en Debian 13 con Plasma 6.3 sobre Wayland y GPU NVIDIA. La creación de paneles en
   una instalación limpia y la pantalla de arranque no se han probado todavía en una máquina real.
-- El medidor de GPU lee el sensor `gpu/gpu0`; sin ese sensor marca 0 %.
+- El medidor de red lee `network/all/download` y `network/all/upload` (suma de todas las interfaces).
 - El zoom del dock llega hasta el alto del panel: Plasma no deja que un widget se salga de él.
 - Chrome y otras apps que no son de KDE no siguen el estilo de los marcos ni de los botones.
 

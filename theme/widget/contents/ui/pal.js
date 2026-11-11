@@ -26,3 +26,10 @@ function weather(code, isDay) {
     if (code <= 82) return ["rain", "AGUACERO", cyan];
     return ["storm", "TORMENTA", pink];
 }
+// bytes por segundo -> texto corto para el HUD ("850K", "1.2M")
+function bps(v) {
+    var n = num(v);
+    if (n < 1024) return Math.round(n) + "B";
+    if (n < 1048576) return Math.round(n / 1024) + "K";
+    return (n / 1048576).toFixed(1) + "M";
+}

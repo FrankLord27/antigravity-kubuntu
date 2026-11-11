@@ -3,7 +3,7 @@
     "KPlugin": {
         "Id": "com.frankf.arcadedeck",
         "Name": "Arcade Deck",
-        "Description": "Dock con zoom, medidores de CPU/GPU/RAM y reloj estilo arcade",
+        "Description": "Dock con zoom, medidores de CPU/RAM/red y reloj estilo arcade",
         "Icon": "input-gaming",
         "Category": "System Information",
         "License": "GPL-2.0+",
