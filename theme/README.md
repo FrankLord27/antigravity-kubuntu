@@ -37,7 +37,10 @@ activa solo en el siguiente inicio de sesión.
 - `aplicar.sh archivos`: descarga lo de terceros en una versión fijada, genera video, iconos,
   cursores, sonidos y esquemas, e instala el widget y el script de KWin. No necesita sesión.
 - `aplicar.sh sesion`: activa colores, iconos, cursor, estilo, efectos y decoración, y crea
-  los paneles con `paneles.js`. Si el dock arcade ya existe, no toca los paneles.
+  los paneles con `paneles.js`, que cuenta las pantallas conectadas en ese momento: pone una
+  barra y un dock en cada una y un único HUD en la primera. Se puede repetir sin duplicar nada;
+  si más adelante conectas otro monitor, vuelve a ejecutarlo y solo se añaden los paneles de
+  esa pantalla.
 
 Nada pesado está en el repo: el video, los sonidos y los iconos ampliados se generan al instalar.
 
