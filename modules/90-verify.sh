@@ -214,10 +214,7 @@ _verify_system() {
             | while IFS= read -r l; do echo -e "      ${C_DIM}${l:0:120}${C_RESET}"; _log "INFO" "kernel: $l"; done
         lsmod 2>/dev/null | grep -q '^nouveau' && ui_info "Con nouveau cargado es normal ver muchos; vuelve a mirar tras reiniciar"
     fi
-}
-    [[ "$kerr" -eq 0 ]] && ui_ok "Sin errores del kernel en este arranque" \
-        || { [[ "$kerr" -le 10 ]] && ui_ok "$kerr mensaje(s) del kernel (normal — hardware i2c/SGX)" \
-        || ui_warn "$kerr error(s) del kernel — journalctl -b -k -p err"; }
+    return 0
 }
 
 _verify_harmony_final() {
