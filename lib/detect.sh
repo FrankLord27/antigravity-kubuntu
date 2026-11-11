@@ -26,6 +26,8 @@ detect_distro() {
 
 is_debian() { [[ "$DETECT_DISTRO" == "debian" ]]; }
 is_ubuntu() { [[ "$DETECT_DISTRO" == "ubuntu" ]]; }
+# nouveau bloqueado en modprobe.d = no cargará en el próximo arranque (lo hace el paquete del driver).
+nouveau_blacklisted() { grep -rqsE '^[[:space:]]*blacklist[[:space:]]+nouveau' /etc/modprobe.d /usr/lib/modprobe.d /lib/modprobe.d; }
 has_nvidia() { [[ "$DETECT_HAS_NVIDIA" == "yes" ]]; }
 
 detect_hardware() {
@@ -126,7 +128,7 @@ detect_harmony() {
     if has_nvidia; then
         [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && [[ "$DETECT_NVIDIA_MODULE" == "missing" ]] && \
             HARMONY_ISSUES+=("NVIDIA: paquete instalado pero módulo NO cargado — DKMS roto")
-        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
+        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && ! nouveau_blacklisted && \
             HARMONY_ISSUES+=("NVIDIA: nouveau activo con driver propietario instalado — conflicto")
         [[ "$DETECT_SECURE_BOOT" == "enabled" ]] && [[ "$DETECT_NVIDIA_DEB_PKG" != "ninguno" ]] && \
             HARMONY_ISSUES+=("Secure Boot ACTIVO — puede impedir carga del módulo NVIDIA")
@@ -170,7 +172,7 @@ calculate_health_score() {
     d=$(( ${#HARMONY_ISSUES[@]} * 12 + ${#HARMONY_WARNINGS[@]} * 3 ))
     if has_nvidia; then
         [[ "$DETECT_NVIDIA_MODULE" == "missing" ]]  && d=$(( d + 20 ))
-        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]]  && d=$(( d + 10 ))
+        [[ "$DETECT_NVIDIA_MODULE" == "nouveau" ]] && ! nouveau_blacklisted && d=$(( d + 10 ))
         [[ "$DETECT_SUSPEND_CONFIGURED" == "no" ]]  && d=$(( d + 6 ))
         [[ "$DETECT_VRAM_PRESERVE" == "no" ]]       && d=$(( d + 3 ))
         [[ "$DETECT_SECURE_BOOT" == "enabled" ]]    && d=$(( d + 8 ))

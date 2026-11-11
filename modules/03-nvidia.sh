@@ -28,7 +28,7 @@ readonly NVIDIA_TARGET_BRANCH="${NVIDIA_DRIVER_VERSION:-580}"
 readonly NVIDIA_TARGET_SUFFIX="${NVIDIA_PKG_SUFFIX-}"
 readonly NVIDIA_TARGET_PKG="nvidia-driver-${NVIDIA_TARGET_BRANCH}${NVIDIA_TARGET_SUFFIX}"
 readonly NVIDIA_MIN_VERSION=578
-readonly CUDA_VERSION="12-8"
+CUDA_VERSION="${CUDA_VERSION:-12-8}"   # la define packages.conf
 
 run_module_nvidia() {
     ui_step "MÓDULO 03 — DRIVER NVIDIA"

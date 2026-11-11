@@ -31,7 +31,7 @@ _verify_nvidia() {
         fi
     }
 
-    local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "")
+    local drv_ver; drv_ver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | grep -E '^[0-9.]+$' | head -1 || true)
     if is_ubuntu && [[ -n "$drv_ver" ]]; then
         local drv_major; drv_major=$(echo "$drv_ver" | cut -d. -f1)
         [[ "$drv_major" -ge 580 ]] && [[ "$drv_major" -lt 590 ]] \
@@ -40,15 +40,19 @@ _verify_nvidia() {
                 && ui_warn "Driver 595+ detectado ($drv_ver) — regresiones en Turing, considera degradar a 580" \
                 || ui_warn "Driver $drv_ver — versión antigua, actualiza a 580"; }
     elif [[ -n "$drv_ver" ]]; then
-        ui_ok "Driver NVIDIA $drv_ver (paquete nvidia-driver de Debian)"
+        ui_ok "Driver NVIDIA $drv_ver cargado"
     fi
 
     local mods; mods=$(lsmod 2>/dev/null | grep '^nvidia' | awk '{print $1}' | tr '\n' ' ')
     [[ -n "$mods" ]] && ui_ok "Módulos NVIDIA: $mods" || ui_info "Módulos NVIDIA aún no cargados (normal antes de reiniciar)"
 
-    lsmod 2>/dev/null | grep -q '^nouveau' \
-        && ui_fail "nouveau ACTIVO — conflicto con driver propietario" \
-        || ui_ok "nouveau correctamente desactivado"
+    if ! lsmod 2>/dev/null | grep -q '^nouveau'; then
+        ui_ok "nouveau correctamente desactivado"
+    elif nouveau_blacklisted; then
+        ui_info "nouveau sigue cargado en ESTE arranque; ya está bloqueado y no cargará al reiniciar"
+    else
+        ui_fail "nouveau ACTIVO y sin bloquear — conflicto con el driver NVIDIA"
+    fi
 
     local ds; ds=$(dkms status 2>/dev/null | grep -i nvidia || echo "sin info")
     echo "$ds" | grep -qi 'installed' && ui_ok "DKMS NVIDIA: $ds" || ui_warn "DKMS: $ds"
@@ -77,7 +81,9 @@ _verify_nvidia() {
 
     silent_cmd glxinfo && {
         local r; r=$(glxinfo 2>/dev/null | grep 'OpenGL renderer' | sed 's/.*: //')
-        echo "$r" | grep -qi nvidia && ui_ok "OpenGL NVIDIA: $r" || ui_warn "OpenGL renderer: $r"
+        if echo "$r" | grep -qi nvidia; then ui_ok "OpenGL NVIDIA: $r"
+        elif echo "$r" | grep -qE '^NV[0-9A-F]+'; then ui_info "OpenGL aún con nouveau ($r) — cambia a NVIDIA al reiniciar"
+        else ui_warn "OpenGL renderer: $r"; fi
     } || ui_info "glxinfo no disponible (apt install mesa-utils) — no crítico en Wayland"
 
     silent_cmd vulkaninfo --summary && ui_ok "Vulkan OK" \

@@ -166,7 +166,7 @@ command -v eza &>/dev/null && {
   alias ll='eza -la --icons --group-directories-first'
   alias lt='eza --tree --icons --level=2'
 }
-# En Debian `bat` se llama batcat y `fd` se llama fdfind.
+# En Debian bat se llama batcat y fd se llama fdfind.
 if command -v bat &>/dev/null; then alias cat='bat --style=plain --paging=never'
 elif command -v batcat &>/dev/null; then alias bat='batcat'; alias cat='batcat --style=plain --paging=never'; fi
 command -v fdfind &>/dev/null && ! command -v fd &>/dev/null && alias fd='fdfind'
