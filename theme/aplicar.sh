@@ -194,6 +194,7 @@ phase_files() {
     step "Plugin de fondo de video" _video_plugin
     step "Widget Arcade Deck" kpackage Plasma/Applet "$SRC/widget"
     step "Script de sonidos de ventanas" kpackage KWin/Script "$SRC/kwin-sonidos"
+    step "Pantalla de carga arcade" kpackage Plasma/LookAndFeel "$SRC/splash"
     step "Servicios de usuario" _units
     step "Perfil de Konsole" _konsole
     step "Konsole sin barras de botones" _konsole_toolbars
@@ -252,6 +253,15 @@ _panels() {
     systemctl --user start plasma-plasmashell.service   # siempre se vuelve a arrancar, falle o no el cambio
 }
 
+# Pantalla que sale tras escribir la clave en el login (la de KDE por defecto o la arcade).
+_splash() {
+    if [[ "${THEME_LOAD_SPLASH:-true}" == true ]]; then
+        kwriteconfig6 --file ksplashrc --group KSplash --key Theme com.frankf.arcadesplash
+    else
+        kwriteconfig6 --file ksplashrc --group KSplash --key Theme org.kde.breeze.desktop
+    fi
+}
+
 phase_session() {
     echo "Tema Arcade Tokyo — sesión"
     if ! qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; then
@@ -262,6 +272,7 @@ phase_session() {
     step "Iconos Pixelitos" _icon_theme
     step "Cursor Arcade Pixel" plasma-apply-cursortheme ArcadePixel
     step "Estilo de Plasma Arcade Tokyo" plasma-apply-desktoptheme ArcadeTokyo
+    step "Pantalla de carga al iniciar sesión" _splash
     step "Efectos, decoración y sonidos de ventanas" _kwin
     step "Servicio del visualizador de audio" _services
     step "Fondo animado, paneles y HUD" _panels

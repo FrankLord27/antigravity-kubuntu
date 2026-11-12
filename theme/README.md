@@ -67,6 +67,13 @@ pantalla) y trae uno propio, compacto, que solo sale con el botón `TECLADO`.
   `theme/instalar_login.sh`.
 - El fondo y la fuente se generan al instalar (no hay imágenes binarias en el repo).
 
+## Pantalla de carga
+
+Tras escribir la clave en el login, Plasma muestra una pantalla de carga. El tema trae la suya
+(`theme/splash/`, paquete Look and Feel): marciano animado, `CARGANDO...` y una barra de bloques que
+avanza con las etapas de Plasma. Se activa con `THEME_LOAD_SPLASH=true`; con `false` se deja la de KDE.
+Para quitarla del todo: `kwriteconfig6 --file ksplashrc --group KSplash --key Theme None`.
+
 ## Límites conocidos
 
 - Probado en Debian 13 con Plasma 6.3 sobre Wayland y GPU NVIDIA. La creación de paneles en

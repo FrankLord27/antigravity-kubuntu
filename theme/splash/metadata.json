@@ -1,0 +1,11 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [{ "Name": "frankf" }],
+        "Description": "Pantalla de carga arcade al iniciar sesión",
+        "Id": "com.frankf.arcadesplash",
+        "License": "GPL-3.0",
+        "Name": "Arcade Tokyo (carga)",
+        "Version": "1.0"
+    }
+}
