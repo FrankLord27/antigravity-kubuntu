@@ -30,7 +30,31 @@ Item {
     readonly property string pixel: "Press Start 2P"
 
     property string error: ""
+    property bool pending: false       // clave escrita mientras PAM aún no pedía contraseña
+    property double lastStart: 0
     onClearPassword: pass.text = ""
+
+    // kscreenlocker no arranca PAM por sí solo: hay que pedirlo cuando la pantalla se usa
+    // (la de Breeze lo hace en cada despertar). Se repite si pasó un rato sin actividad.
+    function ensureAuth() {
+        const now = Date.now()
+        if (now - lastStart > 15000) {
+            lastStart = now
+            authenticator.startAuthenticating()
+        }
+    }
+    function submit() {
+        if (pass.text === "") return
+        if (authenticator.promptForSecret) {
+            pending = false
+            authenticator.respond(pass.text)
+        } else {
+            // PAM todavía no pidió la contraseña: se arranca y se responde en cuanto llegue
+            pending = true
+            lastStart = Date.now()
+            authenticator.startAuthenticating()
+        }
+    }
 
     SessionManagement {
         id: sessionManagement
@@ -44,16 +68,32 @@ Item {
         target: authenticator
         function onFailed(kind) {
             if (kind !== 0) return
+            root.pending = false
             root.error = "GAME OVER - CLAVE INCORRECTA"
             errorTimer.restart()
             retryTimer.restart()
             shake.start()
         }
         function onSucceeded() { Qt.quit() }
-        function onPromptForSecretChanged() { pass.forceActiveFocus() }
+        function onPromptForSecretChanged() {
+            pass.forceActiveFocus()
+            if (root.pending && authenticator.promptForSecret) {
+                root.pending = false
+                authenticator.respond(pass.text)
+            }
+        }
     }
     Timer { id: errorTimer; interval: 3000; onTriggered: root.error = "" }
-    Timer { id: retryTimer; interval: 1500; onTriggered: { root.clearPassword(); authenticator.startAuthenticating() } }
+    Timer { id: retryTimer; interval: 1500; onTriggered: { root.clearPassword(); root.lastStart = Date.now(); authenticator.startAuthenticating() } }
+
+    onViewVisibleChanged: if (viewVisible) ensureAuth()
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        propagateComposedEvents: true
+        onPositionChanged: root.ensureAuth()
+        onPressed: mouse => { root.ensureAuth(); mouse.accepted = false }
+    }
 
     Rectangle { anchors.fill: parent; color: root.bg }
     Image {
@@ -176,8 +216,9 @@ Item {
                 focus: true
                 clip: true
                 enabled: !authenticator.graceLocked
-                Keys.onReturnPressed: authenticator.respond(pass.text)
-                Keys.onEnterPressed: authenticator.respond(pass.text)
+                Keys.onReturnPressed: root.submit()
+                Keys.onEnterPressed: root.submit()
+                Keys.onPressed: event => { root.ensureAuth(); event.accepted = false }
                 Keys.onEscapePressed: root.clearPassword()
             }
             Text {
@@ -201,7 +242,7 @@ Item {
                 color: hover.containsMouse ? root.bg : root.cyan
                 text: "DESBLOQUEAR"; renderType: Text.NativeRendering
             }
-            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; onClicked: authenticator.respond(pass.text) }
+            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.submit() }
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -212,7 +253,7 @@ Item {
     }
 
     Component.onCompleted: {
-        authenticator.startAuthenticating()
+        ensureAuth()
         pass.forceActiveFocus()
     }
 }
