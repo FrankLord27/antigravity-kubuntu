@@ -55,6 +55,18 @@ Se descargan fijados en `configs/theme.conf` (tag o SHA, y suma SHA-256 en las f
 
 El clima sale de [open-meteo.com](https://open-meteo.com), sin cuenta ni clave.
 
+## Login (SDDM)
+
+Tema `arcade` en `theme/sddm/`: fondo con un fotograma del escritorio animado, reloj, caja con marco
+neón, foto de perfil y botones de reiniciar y apagar. Desactiva el teclado virtual de Qt (tapaba media
+pantalla) y trae uno propio, compacto, que solo sale con el botón `TECLADO`.
+
+- La foto sale de `~/.face` y se copia a `/usr/share/sddm/faces/<usuario>.face.icon`, porque SDDM no
+  puede leer tu carpeta personal.
+- Se instala con el módulo 14 (`THEME_LOGIN=true` en `configs/theme.conf`) o a mano con
+  `theme/instalar_login.sh`.
+- El fondo y la fuente se generan al instalar (no hay imágenes binarias en el repo).
+
 ## Límites conocidos
 
 - Probado en Debian 13 con Plasma 6.3 sobre Wayland y GPU NVIDIA. La creación de paneles en
@@ -68,5 +80,7 @@ El clima sale de [open-meteo.com](https://open-meteo.com), sin cuenta ni clave.
 - Paneles: antes de crearlos se guarda una copia en
   `~/.local/share/arcade-tokyo/appletsrc.antes-del-tema`.
 - Pantalla de arranque: `sudo bash theme/instalar_arranque.sh --quitar` (desde el repo).
+- Login: `sudo bash theme/instalar_login.sh --quitar <usuario>`; si SDDM no arranca, borra
+  `/etc/sddm.conf.d/arcade.conf` desde una TTY (Ctrl+Alt+F3).
 - Lo demás se cambia desde Preferencias del sistema (colores, iconos, cursores, estilo de
   Plasma, decoración de ventanas, guiones de KWin).

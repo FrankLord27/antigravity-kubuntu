@@ -7,6 +7,7 @@
 #   • Colores, iconos y cursor pixel art, marcos neón, botones de ventana propios.
 #   • Sonidos chiptune, terminal con fuente pixel y cartel de estado.
 #   • Pantalla de arranque con marcianos (Plymouth).
+#   • Pantalla de login (SDDM) con el mismo estilo, foto de usuario y teclado en pantalla con botón.
 #
 #  Casi todo vive en la carpeta personal del usuario y lo aplica theme/aplicar.sh sin sudo.
 #  Este módulo solo instala paquetes, copia el tema, lanza ese script como el usuario real
@@ -93,6 +94,29 @@ _theme_boot_splash() {
     return $rc
 }
 
+# La pantalla de login se arma en un directorio temporal de root. Lo que sale de la carpeta
+# personal (un fotograma del fondo, la foto de perfil) lo prepara el propio usuario, así root
+# nunca abre un archivo suyo con ffmpeg ni sigue un enlace de su carpeta.
+_theme_login() {
+    local home="$1" dest="$2" ru font utmp tmp rc=0; ru="$(real_user)"
+    font="${home}/.local/share/fonts/PressStart2P-Regular.ttf"
+    utmp="$(_theme_as_user mktemp -d)" || return 1
+    tmp="$(mktemp -d)" || { rm -rf "$utmp"; return 1; }
+    {
+        _theme_as_user ffmpeg -v error -y -ss 12 -i "${dest}/fondo.mp4" -frames:v 1 "${utmp}/fondo.png" || return 1
+        _theme_as_user cp -L "${home}/.face" "${utmp}/face" 2>/dev/null || true
+        [[ -f "${utmp}/fondo.png" && ! -L "${utmp}/fondo.png" && -f "$font" && ! -L "$font" ]] || return 1
+        cp -r "${SCRIPT_DIR}/theme/sddm/." "$tmp"/ || return 1
+        install -d "${tmp}/assets"
+        cp "${utmp}/fondo.png" "${tmp}/assets/fondo.png" || return 1
+        cp "$font" "${tmp}/assets/PressStart2P-Regular.ttf" || return 1
+        [[ -f "${utmp}/face" && ! -L "${utmp}/face" ]] && cp "${utmp}/face" "${tmp}/face"
+        bash "${SCRIPT_DIR}/theme/instalar_login.sh" "$tmp" "$ru"
+    } || rc=$?
+    rm -rf "$tmp" "$utmp"
+    return $rc
+}
+
 run_module_theme() {
     ui_step "MÓDULO 14 — TEMA ARCADE TOKYO"
     if [[ "${INSTALL_THEME:-true}" != true ]]; then
@@ -130,10 +154,19 @@ run_module_theme() {
         fi
     fi
 
+    if [[ "${THEME_LOGIN:-true}" == true ]]; then
+        if ! systemctl list-unit-files 2>/dev/null | grep -q '^sddm.service'; then
+            ui_warn "Pantalla de login omitida: SDDM no está instalado"
+        else
+            run_cmd 1 "Pantalla de login arcade (SDDM)" _theme_login "$home" "$dest"
+        fi
+    fi
+
     ui_panel_end; ui_ok "Módulo 14 completado"
     ui_info "Cierra sesión y vuelve a entrar para que cursor, fuentes e iconos se carguen del todo"
     ui_info "Opciones (ciudad del clima, paneles, sonidos): configs/theme.conf"
     ui_info "Quitar la pantalla de arranque: sudo bash ${SCRIPT_DIR}/theme/instalar_arranque.sh --quitar"
+    ui_info "Quitar el login arcade: sudo bash ${SCRIPT_DIR}/theme/instalar_login.sh --quitar ${ru:-$(real_user)}"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
