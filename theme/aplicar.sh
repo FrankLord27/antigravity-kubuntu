@@ -57,6 +57,22 @@ kpackage() { # kpackage <tipo> <carpeta>: instala o actualiza
     kpackagetool6 -t "$1" -u "$2" >/dev/null 2>&1 || kpackagetool6 -t "$1" -i "$2"
 }
 
+# Pantalla de bloqueo (al suspender o dejar la PC sola). En Plasma 6 sale del paquete de «shell»
+# que indica PLASMA_DEFAULT_SHELL, no del paquete de apariencia. Esa variable se le da solo a KWin
+# (quien lanza el bloqueo) con un drop-in de systemd: así plasmashell sigue con su shell normal.
+# Si el bloqueo propio fallara, kscreenlocker vuelve solo al de KDE. Se activa en el próximo inicio de sesión.
+_lockscreen() {
+    local dest="$DATA/plasma/shells/com.frankf.arcadelock" dropin="$CONFIG/systemd/user/plasma-kwin_wayland.service.d"
+    if [[ "${THEME_LOCKSCREEN:-true}" != true ]]; then
+        rm -rf "$dest" "$dropin/arcade-lock.conf"; systemctl --user daemon-reload; return 0
+    fi
+    rm -rf "$dest"; mkdir -p "$dest" "$dropin" || return 1
+    cp -r "$SRC/lockscreen/." "$dest/" || return 1
+    ffmpeg -v error -y -ss 12 -i "$VIDEO" -frames:v 1 "$dest/contents/lockscreen/fondo.png" || return 1
+    printf '[Service]\nEnvironment=PLASMA_DEFAULT_SHELL=com.frankf.arcadelock\n' > "$dropin/arcade-lock.conf" || return 1
+    systemctl --user daemon-reload
+}
+
 # ─── FASE 1: ARCHIVOS ────────────────────────────────────────────────────────
 _fonts() {
     download "$THEME_FONT_PIXEL_URL" "$THEME_FONT_PIXEL_SHA256" "$DATA/fonts/PressStart2P-Regular.ttf" || return 1
@@ -195,6 +211,7 @@ phase_files() {
     step "Widget Arcade Deck" kpackage Plasma/Applet "$SRC/widget"
     step "Script de sonidos de ventanas" kpackage KWin/Script "$SRC/kwin-sonidos"
     step "Pantalla de carga arcade" kpackage Plasma/LookAndFeel "$SRC/splash"
+    step "Pantalla de bloqueo arcade" _lockscreen
     step "Servicios de usuario" _units
     step "Perfil de Konsole" _konsole
     step "Konsole sin barras de botones" _konsole_toolbars

@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "frankf"
+            }
+        ],
+        "Description": "Pantalla de bloqueo arcade (solo la usa kscreenlocker)",
+        "Id": "com.frankf.arcadelock",
+        "License": "GPL-3.0",
+        "Name": "Arcade Tokyo (bloqueo)",
+        "Version": "1.0"
+    },
+    "X-Plasma-APIVersion": "2"
+}

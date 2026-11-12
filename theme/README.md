@@ -74,6 +74,20 @@ Tras escribir la clave en el login, Plasma muestra una pantalla de carga. El tem
 avanza con las etapas de Plasma. Se activa con `THEME_LOAD_SPLASH=true`; con `false` se deja la de KDE.
 Para quitarla del todo: `kwriteconfig6 --file ksplashrc --group KSplash --key Theme None`.
 
+## Pantalla de bloqueo
+
+Al suspender o dejar la PC sola sale el bloqueo de Plasma, que es distinto del login de SDDM. El tema
+trae el suyo (`theme/lockscreen/`) con el mismo diseño del login: fondo, reloj, caja neón y foto.
+
+- En Plasma 6 el bloqueo sale del paquete de «shell» que indica `PLASMA_DEFAULT_SHELL`, no del paquete de
+  apariencia. El tema instala `com.frankf.arcadelock` en `~/.local/share/plasma/shells/` y crea el drop-in
+  `~/.config/systemd/user/plasma-kwin_wayland.service.d/arcade-lock.conf`, que le da esa variable solo a
+  KWin (quien lanza el bloqueo); plasmashell no la ve y sigue con su shell normal.
+- Se activa en el próximo inicio de sesión. Si el bloqueo propio fallara, kscreenlocker vuelve al de KDE.
+- Opción: `THEME_LOCKSCREEN` en `configs/theme.conf`. Quitarlo:
+  `rm ~/.config/systemd/user/plasma-kwin_wayland.service.d/arcade-lock.conf` y volver a iniciar sesión.
+- Probar sin bloquear: `/usr/lib/x86_64-linux-gnu/libexec/kscreenlocker_greet --testing --shell com.frankf.arcadelock`.
+
 ## Límites conocidos
 
 - Probado en Debian 13 con Plasma 6.3 sobre Wayland y GPU NVIDIA. La creación de paneles en
