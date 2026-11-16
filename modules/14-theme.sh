@@ -111,7 +111,7 @@ _theme_login() {
         cp "${utmp}/fondo.png" "${tmp}/assets/fondo.png" || return 1
         cp "$font" "${tmp}/assets/PressStart2P-Regular.ttf" || return 1
         [[ -f "${utmp}/face" && ! -L "${utmp}/face" ]] && cp "${utmp}/face" "${tmp}/face"
-        bash "${SCRIPT_DIR}/theme/instalar_login.sh" "$tmp" "$ru"
+        ARCADE_MONITOR="${THEME_LOGIN_MONITOR:-}" bash "${SCRIPT_DIR}/theme/instalar_login.sh" "$tmp" "$ru"
     } || rc=$?
     rm -rf "$tmp" "$utmp"
     return $rc

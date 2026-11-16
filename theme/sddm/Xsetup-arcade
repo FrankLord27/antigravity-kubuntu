@@ -1,11 +1,29 @@
 #!/bin/sh
 # Xsetup del login arcade: corre como root antes de que aparezca el login (X11).
 # 1) Ejecuta el Xsetup original de Debian.
-# 2) Marca como monitor principal el que tiene 1920x1080 como modo preferido (el «+»),
-#    porque el login solo se dibuja en el principal. Los nombres de salida bajo X11 con
-#    NVIDIA no siempre coinciden con los de Plasma (DP-2), por eso se busca por resolución.
+# 2) Marca el monitor principal, porque el login solo se dibuja en él. Sirve en cualquier PC:
+#    - si existe /etc/sddm/arcade-monitor (lo escribe instalar_login.sh con THEME_LOGIN_MONITOR),
+#      se usa esa salida (por ejemplo DP-2 o eDP-1);
+#    - si no, el monitor conectado con más píxeles en su modo preferido (en un portátil solo,
+#      su pantalla). Los nombres de salida bajo X11 con NVIDIA no siempre coinciden con los
+#      de Plasma, por eso no se usa el nombre salvo que se pida.
 [ -x /usr/share/sddm/scripts/Xsetup ] && /usr/share/sddm/scripts/Xsetup
 
-PRINCIPAL=$(xrandr --query | awk '/ connected/ { out = $1 } /^ +1920x1080 .*\+/ { print out; exit }')
+SALIDAS=$(xrandr --query) || exit 0
+PRINCIPAL=""
+if [ -s /etc/sddm/arcade-monitor ]; then
+    PEDIDO=$(head -n 1 /etc/sddm/arcade-monitor | tr -d '[:space:]')
+    printf '%s\n' "$SALIDAS" | grep -q "^$PEDIDO connected" && PRINCIPAL=$PEDIDO
+fi
+if [ -z "$PRINCIPAL" ]; then
+    PRINCIPAL=$(printf '%s\n' "$SALIDAS" | awk '
+        / connected/ { out = $1; next }
+        / disconnected/ { out = ""; next }
+        out != "" && /^ +[0-9]+x[0-9]+ .*\+/ {
+            split($1, wh, "x"); a = wh[1] * wh[2]
+            if (a > best) { best = a; pick = out }
+        }
+        END { print pick }')
+fi
 [ -n "$PRINCIPAL" ] && xrandr --output "$PRINCIPAL" --primary
 exit 0
