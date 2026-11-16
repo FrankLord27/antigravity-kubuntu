@@ -1,0 +1,11 @@
+#!/bin/sh
+# Xsetup del login arcade: corre como root antes de que aparezca el login (X11).
+# 1) Ejecuta el Xsetup original de Debian.
+# 2) Marca como monitor principal el que tiene 1920x1080 como modo preferido (el «+»),
+#    porque el login solo se dibuja en el principal. Los nombres de salida bajo X11 con
+#    NVIDIA no siempre coinciden con los de Plasma (DP-2), por eso se busca por resolución.
+[ -x /usr/share/sddm/scripts/Xsetup ] && /usr/share/sddm/scripts/Xsetup
+
+PRINCIPAL=$(xrandr --query | awk '/ connected/ { out = $1 } /^ +1920x1080 .*\+/ { print out; exit }')
+[ -n "$PRINCIPAL" ] && xrandr --output "$PRINCIPAL" --primary
+exit 0

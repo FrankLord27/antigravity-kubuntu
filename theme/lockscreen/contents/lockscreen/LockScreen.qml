@@ -29,6 +29,19 @@ Item {
     readonly property real k: Math.min(width / 1920, height / 1080)
     readonly property string pixel: "Press Start 2P"
 
+    // kscreenlocker crea esta vista una vez por monitor; la caja y el reloj solo se dibujan en el
+    // principal y los demás quedan con el fondo. Wayland no dice cuál es el principal de Plasma,
+    // así que se toma el más grande (si empatan, el de más a la izquierda).
+    readonly property bool principal: {
+        const ss = Qt.application.screens
+        let best = null
+        for (let i = 0; i < ss.length; i++) {
+            const s = ss[i], a = s.width * s.height, b = best ? best.width * best.height : -1
+            if (a > b || (a === b && s.virtualX < best.virtualX)) best = s
+        }
+        return best === null || Screen.name === "" || Screen.name === best.name
+    }
+
     property string error: ""
     property bool pending: false       // clave escrita mientras PAM aún no pedía contraseña
     property double lastStart: 0
@@ -76,7 +89,7 @@ Item {
         }
         function onSucceeded() { Qt.quit() }
         function onPromptForSecretChanged() {
-            pass.forceActiveFocus()
+            if (root.principal) pass.forceActiveFocus()
             if (root.pending && authenticator.promptForSecret) {
                 root.pending = false
                 authenticator.respond(pass.text)
@@ -107,8 +120,29 @@ Item {
     opacity: 0
     NumberAnimation on opacity { to: 1; duration: 300; running: true }
 
+    // ---------- monitores secundarios: si escriben o hacen clic aquí, se avisa dónde está la caja ----------
+    Item {
+        id: otherScreen
+        anchors.fill: parent
+        visible: !root.principal
+        focus: !root.principal
+        Keys.onPressed: event => { hint.opacity = 1; hintTimer.restart(); event.accepted = true }
+        MouseArea { anchors.fill: parent; onPressed: { hint.opacity = 1; hintTimer.restart() } }
+        Text {
+            id: hint
+            anchors.centerIn: parent
+            opacity: 0
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+            font.family: root.pixel; font.pixelSize: 16 * root.k
+            color: root.pink; renderType: Text.NativeRendering
+            text: "DESBLOQUEA EN LA PANTALLA PRINCIPAL"
+        }
+        Timer { id: hintTimer; interval: 2500; onTriggered: hint.opacity = 0 }
+    }
+
     // ---------- reloj ----------
     Item {
+        visible: root.principal
         anchors.horizontalCenter: parent.horizontalCenter
         y: 90 * root.k
         width: clockText.width
@@ -134,6 +168,7 @@ Item {
     // ---------- caja ----------
     Item {
         id: box
+        visible: root.principal
         width: 620 * root.k; height: 330 * root.k
         x: (root.width - width) / 2
         y: (root.height - height) / 2 + 60 * root.k
@@ -204,16 +239,42 @@ Item {
             x: 32 * root.k; y: 160 * root.k
             width: parent.width - 64 * root.k; height: 52 * root.k
             color: "#16161e"
-            border.width: 2; border.color: pass.activeFocus ? root.cyan : root.mute
+            border.width: 2
+            border.color: pass.activeFocus ? root.cyan : (fieldHover.hovered ? root.purple : root.mute)
+            // cursor de texto (I) sobre todo el recuadro, no solo sobre el área interna
+            HoverHandler { id: fieldHover; cursorShape: Qt.IBeamCursor }
+            // bloques dibujados a mano: el glifo «■» no está en Press Start 2P y cada pantalla
+            // lo tomaba de otra fuente, con otro ancho. Así el login y el bloqueo son idénticos.
+            Item {
+                anchors.fill: parent; anchors.margins: 14 * root.k; clip: true
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6 * root.k
+                    Repeater {
+                        model: pass.length
+                        Rectangle { width: 14 * root.k; height: 14 * root.k; color: root.green }
+                    }
+                    Rectangle {
+                        width: 3 * root.k; height: 22 * root.k; color: root.green
+                        visible: pass.activeFocus
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0; duration: 500 }
+                            NumberAnimation { to: 1; duration: 500 }
+                        }
+                    }
+                }
+            }
             TextInput {
                 id: pass
                 anchors.fill: parent; anchors.margins: 14 * root.k
                 verticalAlignment: TextInput.AlignVCenter
                 font.family: root.pixel; font.pixelSize: 18 * root.k
-                color: root.green
+                color: "transparent"; selectionColor: "transparent"; selectedTextColor: "transparent"
+                cursorDelegate: Item {}
                 echoMode: TextInput.Password
                 passwordCharacter: "■"
-                focus: true
+                focus: root.principal
                 clip: true
                 enabled: !authenticator.graceLocked
                 Keys.onReturnPressed: root.submit()
@@ -242,7 +303,7 @@ Item {
                 color: hover.containsMouse ? root.bg : root.cyan
                 text: "DESBLOQUEAR"; renderType: Text.NativeRendering
             }
-            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.submit() }
+            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.submit() }
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -254,6 +315,7 @@ Item {
 
     Component.onCompleted: {
         ensureAuth()
-        pass.forceActiveFocus()
+        if (root.principal) pass.forceActiveFocus()
+        else otherScreen.forceActiveFocus()
     }
 }

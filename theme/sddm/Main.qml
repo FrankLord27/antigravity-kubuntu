@@ -26,6 +26,9 @@ Rectangle {
     property bool kb: false        // teclado en pantalla (solo si se pide con el botón)
     property bool shift: false
     property bool symbols: false
+    // SDDM crea esta vista una vez por monitor; el login solo se dibuja en el principal
+    // y los demás quedan con el fondo. Si la propiedad no existe (modo prueba), se muestra.
+    readonly property bool principal: typeof primaryScreen === "undefined" || primaryScreen
 
     Image {
         anchors.fill: parent
@@ -48,6 +51,7 @@ Rectangle {
 
     // ---------- reloj ----------
     Item {
+        visible: root.principal
         anchors.horizontalCenter: parent.horizontalCenter
         y: 90 * root.k
         width: clockText.width
@@ -97,6 +101,7 @@ Rectangle {
     // ---------- caja de login ----------
     Item {
         id: box
+        visible: root.principal
         anchors.centerIn: parent
         anchors.verticalCenterOffset: (root.kb ? -150 : 60) * root.k
         Behavior on anchors.verticalCenterOffset { NumberAnimation { duration: 150 } }
@@ -168,11 +173,11 @@ Rectangle {
                 spacing: 14 * root.k
                 Text {
                     font.family: pixel.name; font.pixelSize: 20 * root.k; color: root.cyan; text: "<"
-                    MouseArea { anchors.fill: parent; anchors.margins: -10; onClicked: userList.decrementCurrentIndex() }
+                    MouseArea { anchors.fill: parent; anchors.margins: -10; cursorShape: Qt.PointingHandCursor; onClicked: userList.decrementCurrentIndex() }
                 }
                 Text {
                     font.family: pixel.name; font.pixelSize: 20 * root.k; color: root.cyan; text: ">"
-                    MouseArea { anchors.fill: parent; anchors.margins: -10; onClicked: userList.incrementCurrentIndex() }
+                    MouseArea { anchors.fill: parent; anchors.margins: -10; cursorShape: Qt.PointingHandCursor; onClicked: userList.incrementCurrentIndex() }
                 }
             }
         }
@@ -182,16 +187,42 @@ Rectangle {
             x: 32 * root.k; y: 160 * root.k
             width: parent.width - 64 * root.k; height: 52 * root.k
             color: "#16161e"
-            border.width: 2; border.color: pass.activeFocus ? root.cyan : root.mute
+            border.width: 2
+            border.color: pass.activeFocus ? root.cyan : (fieldHover.hovered ? root.purple : root.mute)
+            // cursor de texto (I) sobre todo el recuadro, no solo sobre el área interna
+            HoverHandler { id: fieldHover; cursorShape: Qt.IBeamCursor }
+            // bloques dibujados a mano: el glifo «■» no está en Press Start 2P y cada pantalla
+            // lo tomaba de otra fuente, con otro ancho. Así el login y el bloqueo son idénticos.
+            Item {
+                anchors.fill: parent; anchors.margins: 14 * root.k; clip: true
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6 * root.k
+                    Repeater {
+                        model: pass.length
+                        Rectangle { width: 14 * root.k; height: 14 * root.k; color: root.green }
+                    }
+                    Rectangle {
+                        width: 3 * root.k; height: 22 * root.k; color: root.green
+                        visible: pass.activeFocus
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0; duration: 500 }
+                            NumberAnimation { to: 1; duration: 500 }
+                        }
+                    }
+                }
+            }
             TextInput {
                 id: pass
                 anchors.fill: parent; anchors.margins: 14 * root.k
                 verticalAlignment: TextInput.AlignVCenter
                 font.family: pixel.name; font.pixelSize: 18 * root.k
-                color: root.green
+                color: "transparent"; selectionColor: "transparent"; selectedTextColor: "transparent"
+                cursorDelegate: Item {}
                 echoMode: TextInput.Password
                 passwordCharacter: "■"
-                focus: true
+                focus: root.principal
                 clip: true
                 enabled: !root.busy
                 Keys.onReturnPressed: root.doLogin()
@@ -221,7 +252,7 @@ Rectangle {
                 text: root.busy ? "CARGANDO..." : "START"
                 renderType: Text.NativeRendering
             }
-            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; onClicked: root.doLogin() }
+            MouseArea { id: hover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.doLogin() }
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -234,6 +265,7 @@ Rectangle {
 
     // ---------- apagar / reiniciar ----------
     Row {
+        visible: root.principal
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom; anchors.bottomMargin: 60 * root.k
         spacing: 36 * root.k
@@ -256,7 +288,7 @@ Rectangle {
                     renderType: Text.NativeRendering
                 }
                 MouseArea {
-                    id: m; anchors.fill: parent; hoverEnabled: true
+                    id: m; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: modelData.a === 0 ? sddm.reboot() : (modelData.a === 1 ? sddm.powerOff() : (root.kb = !root.kb))
                 }
             }
@@ -267,7 +299,7 @@ Rectangle {
     // ---------- teclado en pantalla (solo aparece con el botón TECLADO) ----------
     Item {
         id: keyboard
-        visible: root.kb
+        visible: root.kb && root.principal
         anchors.horizontalCenter: parent.horizontalCenter
         y: 640 * root.k
         width: 760 * root.k
@@ -332,5 +364,5 @@ Rectangle {
         }
     }
 
-    Component.onCompleted: pass.forceActiveFocus()
+    Component.onCompleted: if (root.principal) pass.forceActiveFocus()
 }

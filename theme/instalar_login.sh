@@ -16,12 +16,13 @@ set -euo pipefail
 DST=/usr/share/sddm/themes/arcade
 CONF=/etc/sddm.conf.d/arcade.conf
 FACES=/usr/share/sddm/faces
+XSETUP=/etc/sddm/Xsetup-arcade
 
 user_ok() { [[ -z "$1" || "$1" =~ ^[a-z_][a-z0-9_-]*$ ]]; }
 
 if [[ "${1:-}" == "--quitar" ]]; then
     U="${2:-}"; user_ok "$U" || { echo "Usuario no válido."; exit 1; }
-    rm -rf "$DST" "$CONF"
+    rm -rf "$DST" "$CONF" "$XSETUP"
     if [[ -n "$U" ]]; then
         # se devuelve la foto que había antes (si había); si no, se quita la copia del tema
         if [[ -f "$FACES/$U.face.icon.respaldo-arcade" ]]; then mv -f "$FACES/$U.face.icon.respaldo-arcade" "$FACES/$U.face.icon"
@@ -46,6 +47,11 @@ install -m 644 -o root -g root "$SRC"/assets/* "$DST/assets"/
 install -d -m 755 /etc/sddm.conf.d
 # InputMethod vacío: sin el teclado virtual de Qt (tapa media pantalla). El tema trae el suyo, con botón.
 printf '[General]\nInputMethod=\n\n[Theme]\nCurrent=arcade\n' > "$CONF"
+# Con varios monitores el login solo se dibuja en el principal; Xsetup-arcade lo fija antes del login.
+if [[ -f "$SRC/Xsetup-arcade" ]]; then
+    install -D -m 755 -o root -g root "$SRC/Xsetup-arcade" "$XSETUP"
+    printf '\n[X11]\nDisplayCommand=%s\n' "$XSETUP" >> "$CONF"
+fi
 # La carpeta personal es privada: SDDM no puede leer ~/.face, así que la foto se copia donde sí puede.
 if [[ -n "$U" && -f "$SRC/face" ]]; then
     [[ -f "$FACES/$U.face.icon" && ! -f "$FACES/$U.face.icon.respaldo-arcade" ]] && cp -p "$FACES/$U.face.icon" "$FACES/$U.face.icon.respaldo-arcade"
