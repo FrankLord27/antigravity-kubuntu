@@ -20,5 +20,5 @@ Rectangle {
         text: key.label
         renderType: Text.NativeRendering
     }
-    MouseArea { id: ma; anchors.fill: parent; onClicked: key.clicked() }
+    MouseArea { id: ma; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: key.clicked() }
 }
