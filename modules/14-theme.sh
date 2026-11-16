@@ -94,6 +94,17 @@ _theme_boot_splash() {
     return $rc
 }
 
+# El menú de GRUB, igual: se genera en un directorio temporal de root y lo instala el script del repo.
+_theme_grub() {
+    local home="$1" tmp rc=0
+    tmp="$(mktemp -d)" || return 1
+    ARCADE_HOME="$tmp" ARCADE_FONT="${home}/.local/share/fonts/PressStart2P-Regular.ttf" \
+        python3 -I "${SCRIPT_DIR}/theme/gen/grub.py" \
+        && bash "${SCRIPT_DIR}/theme/instalar_grub.sh" "${tmp}/grub/arcade" "${THEME_GRUB_TIMEOUT:-3}" || rc=$?
+    rm -rf "$tmp"
+    return $rc
+}
+
 # La pantalla de login se arma en un directorio temporal de root. Lo que sale de la carpeta
 # personal (un fotograma del fondo, la foto de perfil) lo prepara el propio usuario, así root
 # nunca abre un archivo suyo con ffmpeg ni sigue un enlace de su carpeta.
@@ -154,6 +165,16 @@ run_module_theme() {
         fi
     fi
 
+    if [[ "${THEME_GRUB:-true}" == true ]]; then
+        if ! is_cmd_available grub-mkfont || [[ ! -d /boot/grub ]]; then
+            ui_warn "Menú de GRUB omitido: este equipo no usa GRUB"
+        elif grep -q '^GRUB_THEME=.*arcade' /etc/default/grub; then
+            ui_skip "Menú de GRUB arcade"
+        else
+            run_cmd 1 "Menú de GRUB arcade" _theme_grub "$home"
+        fi
+    fi
+
     if [[ "${THEME_LOGIN:-true}" == true ]]; then
         if ! systemctl list-unit-files 2>/dev/null | grep -q '^sddm.service'; then
             ui_warn "Pantalla de login omitida: SDDM no está instalado"
@@ -166,6 +187,7 @@ run_module_theme() {
     ui_info "Cierra sesión y vuelve a entrar para que cursor, fuentes e iconos se carguen del todo"
     ui_info "Opciones (ciudad del clima, paneles, sonidos): configs/theme.conf"
     ui_info "Quitar la pantalla de arranque: sudo bash ${SCRIPT_DIR}/theme/instalar_arranque.sh --quitar"
+    ui_info "Quitar el menú de GRUB arcade: sudo bash ${SCRIPT_DIR}/theme/instalar_grub.sh --quitar"
     ui_info "Quitar el login arcade: sudo bash ${SCRIPT_DIR}/theme/instalar_login.sh --quitar ${ru:-$(real_user)}"
 }
 
