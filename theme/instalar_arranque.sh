@@ -15,6 +15,8 @@ set -euo pipefail
 DST=/usr/share/plymouth/themes/arcade
 GRUB=/etc/default/grub
 PREV_FILE=/etc/plymouth/tema-anterior-arcade
+MODS=/etc/initramfs-tools/modules
+MARK="# arcade: NVIDIA temprano para Plymouth"
 
 if [[ "${1:-}" == "--quitar" ]]; then
     PREV="$(cat "$PREV_FILE" 2>/dev/null || true)"
@@ -22,6 +24,7 @@ if [[ "${1:-}" == "--quitar" ]]; then
     [[ -n "$PREV" && -d "/usr/share/plymouth/themes/$PREV" ]] || PREV=details
     # solo se quita «splash»; el resto de /etc/default/grub se deja como esté ahora
     sed -i -E '/^GRUB_CMDLINE_LINUX_DEFAULT=/ s/ ?splash//' "$GRUB"
+    [[ -f "$MODS" ]] && sed -i "/^$MARK\$/,+3d" "$MODS"
     plymouth-set-default-theme -R "$PREV"
     update-grub
     rm -rf "$DST" "$PREV_FILE"
@@ -39,10 +42,18 @@ if find "$SRC" -type l | grep -q .; then echo "La carpeta del tema contiene enla
 rm -rf "$DST"
 install -d -m 755 "$DST"
 install -m 644 -o root -g root "$SRC"/* "$DST"/
-# «splash» activa la pantalla gráfica; «quiet» ya oculta los mensajes del kernel
-if ! grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=.*splash' "$GRUB"; then
-    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 splash"/' "$GRUB"
+# NVIDIA: sin el driver dentro del initramfs no hay pantalla gráfica cuando arranca Plymouth
+# (el kernel de Debian no trae simpledrm), y el arranque queda en negro hasta el login.
+if modinfo nvidia_drm >/dev/null 2>&1 && ! grep -qxF "$MARK" "$MODS"; then
+    printf '\n%s\nnvidia\nnvidia_modeset\nnvidia_drm\n' "$MARK" >> "$MODS"
 fi
+# «quiet» oculta los mensajes y «splash» activa la pantalla arcade: se asegura que estén las dos
+for opt in quiet splash; do
+    grep -qE "^GRUB_CMDLINE_LINUX_DEFAULT=.*\b$opt\b" "$GRUB" ||
+        sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 $opt\"/" "$GRUB"
+done
+# sin espacio sobrante al inicio si la línea estaba vacía
+sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=" /GRUB_CMDLINE_LINUX_DEFAULT="/' "$GRUB"
 grep '^GRUB_CMDLINE_LINUX_DEFAULT' "$GRUB"
 echo "Reconstruyendo el initramfs (tarda alrededor de un minuto)..."
 plymouth-set-default-theme -R arcade
