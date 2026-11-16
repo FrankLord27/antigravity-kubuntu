@@ -69,10 +69,25 @@ open(f"{DEST}/arcade.script", "w").write("""# Pantalla de arranque arcade: marci
 Window.SetBackgroundTopColor (0.102, 0.106, 0.149);
 Window.SetBackgroundBottomColor (0.102, 0.106, 0.149);
 
-sw = Window.GetWidth ();
-sh = Window.GetHeight ();
-cx = Window.GetX () + sw / 2;
-cy = Window.GetY () + sh / 2;
+# Con varios monitores Window.GetWidth () sin número mide todos juntos y el centro cae a un lado
+# (en dos pantallas, hacia la derecha). Se centra en el monitor más grande; los demás quedan
+# con el fondo liso. Con un solo monitor (un portátil) es ese monitor.
+best = 0;
+best_area = 0;
+for (i = 0; i < 8; i++) {
+    w = Window.GetWidth (i);
+    if (w > 0) {
+        area = w * Window.GetHeight (i);
+        if (area > best_area) {
+            best = i;
+            best_area = area;
+        }
+    }
+}
+sw = Window.GetWidth (best);
+sh = Window.GetHeight (best);
+cx = Window.GetX (best) + sw / 2;
+cy = Window.GetY (best) + sh / 2;
 
 NUM = 7;
 STEP = 140;
