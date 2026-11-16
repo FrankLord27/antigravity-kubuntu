@@ -17,12 +17,13 @@ DST=/usr/share/sddm/themes/arcade
 CONF=/etc/sddm.conf.d/arcade.conf
 FACES=/usr/share/sddm/faces
 XSETUP=/etc/sddm/Xsetup-arcade
+MONITOR=/etc/sddm/arcade-monitor   # salida fija del login (opcional; vacío = la pantalla más grande)
 
 user_ok() { [[ -z "$1" || "$1" =~ ^[a-z_][a-z0-9_-]*$ ]]; }
 
 if [[ "${1:-}" == "--quitar" ]]; then
     U="${2:-}"; user_ok "$U" || { echo "Usuario no válido."; exit 1; }
-    rm -rf "$DST" "$CONF" "$XSETUP"
+    rm -rf "$DST" "$CONF" "$XSETUP" "$MONITOR"
     if [[ -n "$U" ]]; then
         # se devuelve la foto que había antes (si había); si no, se quita la copia del tema
         if [[ -f "$FACES/$U.face.icon.respaldo-arcade" ]]; then mv -f "$FACES/$U.face.icon.respaldo-arcade" "$FACES/$U.face.icon"
@@ -51,6 +52,9 @@ printf '[General]\nInputMethod=\n\n[Theme]\nCurrent=arcade\n' > "$CONF"
 if [[ -f "$SRC/Xsetup-arcade" ]]; then
     install -D -m 755 -o root -g root "$SRC/Xsetup-arcade" "$XSETUP"
     printf '\n[X11]\nDisplayCommand=%s\n' "$XSETUP" >> "$CONF"
+    # ARCADE_MONITOR (THEME_LOGIN_MONITOR en configs/theme.conf): nombre de salida, p. ej. DP-2 o eDP-1
+    MON="${ARCADE_MONITOR:-}"
+    if [[ "$MON" =~ ^[A-Za-z0-9_-]+$ ]]; then printf '%s\n' "$MON" > "$MONITOR"; else rm -f "$MONITOR"; fi
 fi
 # La carpeta personal es privada: SDDM no puede leer ~/.face, así que la foto se copia donde sí puede.
 if [[ -n "$U" && -f "$SRC/face" ]]; then

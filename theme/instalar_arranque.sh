@@ -23,7 +23,7 @@ if [[ "${1:-}" == "--quitar" ]]; then
     # sin tema anterior guardado se vuelve a «details», que existe en cualquier instalación de Plymouth
     [[ -n "$PREV" && -d "/usr/share/plymouth/themes/$PREV" ]] || PREV=details
     # solo se quita «splash»; el resto de /etc/default/grub se deja como esté ahora
-    sed -i -E '/^GRUB_CMDLINE_LINUX_DEFAULT=/ s/ ?splash//' "$GRUB"
+    sed -i -E '/^GRUB_CMDLINE_LINUX_DEFAULT=/ s/ ?(splash|systemd\.show_status=false)//g' "$GRUB"
     [[ -f "$MODS" ]] && sed -i "/^$MARK\$/,+3d" "$MODS"
     plymouth-set-default-theme -R "$PREV"
     update-grub
@@ -47,9 +47,10 @@ install -m 644 -o root -g root "$SRC"/* "$DST"/
 if modinfo nvidia_drm >/dev/null 2>&1 && ! grep -qxF "$MARK" "$MODS"; then
     printf '\n%s\nnvidia\nnvidia_modeset\nnvidia_drm\n' "$MARK" >> "$MODS"
 fi
-# «quiet» oculta los mensajes y «splash» activa la pantalla arcade: se asegura que estén las dos
-for opt in quiet splash; do
-    grep -qE "^GRUB_CMDLINE_LINUX_DEFAULT=.*\b$opt\b" "$GRUB" ||
+# «quiet» oculta los mensajes, «splash» activa la pantalla arcade y «systemd.show_status=false»
+# evita que, al cerrarse Plymouth, salgan unas líneas «[ OK ]» antes del login.
+for opt in quiet splash systemd.show_status=false; do
+    grep -qE "^GRUB_CMDLINE_LINUX_DEFAULT=.*[\" ]${opt//./\\.}[\" ]" "$GRUB" ||
         sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 $opt\"/" "$GRUB"
 done
 # sin espacio sobrante al inicio si la línea estaba vacía
