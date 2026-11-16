@@ -33,7 +33,11 @@ activa solo en el siguiente inicio de sesión.
 - `modules/14-theme.sh` (root): instala paquetes, copia esta carpeta a
   `~/.local/share/arcade-tokyo/src`, lanza `aplicar.sh` como tu usuario y, para la pantalla de
   arranque, la genera en un directorio temporal de root y la instala con `instalar_arranque.sh`
-  (nada de lo que corre como root sale de la carpeta personal).
+  (nada de lo que corre como root sale de la carpeta personal). El menú de GRUB sigue el mismo
+  camino: `gen/grub.py` lo genera (fondo, marco neón, iconos de invaders, fuente Press Start 2P) y
+  `instalar_grub.sh` lo instala en `/boot/grub/themes/arcade`, con el tiempo de espera de
+  `THEME_GRUB_TIMEOUT`. El login elige el monitor principal solo (el de más píxeles) o el de
+  `THEME_LOGIN_MONITOR`.
 - `aplicar.sh archivos`: descarga lo de terceros en una versión fijada, genera video, iconos,
   cursores, sonidos y esquemas, e instala el widget y el script de KWin. No necesita sesión.
 - `aplicar.sh sesion`: activa colores, iconos, cursor, estilo, efectos y decoración, y crea
@@ -101,6 +105,9 @@ trae el suyo (`theme/lockscreen/`) con el mismo diseño del login: fondo, reloj,
 - Paneles: antes de crearlos se guarda una copia en
   `~/.local/share/arcade-tokyo/appletsrc.antes-del-tema`.
 - Pantalla de arranque: `sudo bash theme/instalar_arranque.sh --quitar` (desde el repo).
+- Menú de GRUB: `sudo bash theme/instalar_grub.sh --quitar`; si un tema fallara, GRUB muestra su
+  menú de texto y sigue arrancando. El respaldo de `/etc/default/grub` queda en
+  `/etc/default/grub.respaldo-grub-arcade`.
 - Login: `sudo bash theme/instalar_login.sh --quitar <usuario>`; si SDDM no arranca, borra
   `/etc/sddm.conf.d/arcade.conf` desde una TTY (Ctrl+Alt+F3).
 - Lo demás se cambia desde Preferencias del sistema (colores, iconos, cursores, estilo de
