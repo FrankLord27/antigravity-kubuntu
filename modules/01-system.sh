@@ -102,6 +102,11 @@ run_module_system() {
     id -nG "$ru" 2>/dev/null | grep -qw sudo && ui_skip "$ru ya está en el grupo sudo" \
         || run_cmd 1 "Agregar $ru al grupo sudo" usermod -aG sudo "$ru"
 
+    # Asteriscos al escribir la clave de sudo (muestra el largo de la clave, no la clave).
+    # Si visudo encuentra un error, el archivo se borra para no romper sudo.
+    [[ -f /etc/sudoers.d/pwfeedback ]] && ui_skip "sudo pwfeedback" || run_cmd 1 "sudo: mostrar asteriscos al escribir la clave" bash -c \
+        'echo "Defaults pwfeedback" > /etc/sudoers.d/pwfeedback && chmod 440 /etc/sudoers.d/pwfeedback && visudo -cq || { rm -f /etc/sudoers.d/pwfeedback; exit 1; }'
+
     # Parches de seguridad automáticos (solo seguridad, sin reinicios).
     is_deb_installed unattended-upgrades && ui_skip "unattended-upgrades" \
         || run_cmd 1 "Instalar unattended-upgrades" apt-get install -y unattended-upgrades
